@@ -47,15 +47,21 @@ static long time_offset = 0;
 static ntp_time time_server;
 static bool time_fetching=false;
 
-// the screen/control declarations
-screen_t main_screen({320,240},sizeof(lcd_transfer_buffer1),lcd_transfer_buffer1,lcd_transfer_buffer2);
+// the screen/control definitions
+screen_t main_screen(
+    {320,240},
+    sizeof(lcd_transfer_buffer1),
+    lcd_transfer_buffer1,
+    lcd_transfer_buffer2);
 svg_clock_t ana_clock(main_screen);
 label_t dig_clock(main_screen);
 canvas_t wifi_icon(main_screen);
 canvas_t battery_icon(main_screen);
+
 // for dumping to the display (UIX)
 static void lcd_flush(const rect16& bounds,const void* bmp,void* state) {
-    // wrap the void* bitmap buffer with a read only (const) bitmap object - this is a light and fast op
+    // wrap the void* bitmap buffer with a read only (const) bitmap object
+    // this is a light and fast op
     const const_bitmap<decltype(lcd)::pixel_type> cbmp(bounds.dimensions(),bmp);
     // send what we just created to the display
     draw::bitmap_async(lcd,bounds,cbmp,cbmp.bounds());
@@ -67,7 +73,8 @@ static void lcd_wait_flush(void* state) {
 }
 // for the touch panel
 static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void* state) {
-    // UIX supports multiple touch points. so does the FT6336 so we potentially have two values
+    // UIX supports multiple touch points. so does the FT6336 so we potentially have
+    // two values
     *in_out_locations_size = 0;
     uint16_t x,y;
     if(touch.xy(&x,&y)) {
@@ -89,10 +96,7 @@ static void update_time_buffer(time_t time) {
         *time_buffer=' ';
     }
 }
-// grabs the timezone offset based on IP
-static void fetch_time_offset() {
-    ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0);
-}
+
 static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* state) {
     if(time_fetching) {
         draw::icon(destination,point16::zero(),faWifi,color_t::light_gray);
@@ -233,7 +237,8 @@ void loop()
         case 3: // fetch
             Serial.println("Retrieving time info...");
             connection_refresh_ts = millis();
-            fetch_time_offset();
+            // grabs the timezone offset based on IP
+            ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0);
             WiFi.hostByName(time_server_domain,time_server_ip);
             connection_state = 4;
             time_ts = millis(); // we're going to correct for latency

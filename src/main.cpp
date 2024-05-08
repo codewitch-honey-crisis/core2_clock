@@ -9,7 +9,6 @@
 #include <WiFi.h>
 #include <ip_loc.hpp>
 #include <ntp_time.hpp>
-
 // font is a TTF/OTF from downloaded from fontsquirrel.com
 // converted to a header with https://honeythecodewitch.com/gfx/converter
 #define OPENSANS_REGULAR_IMPLEMENTATION
@@ -30,22 +29,21 @@ using namespace uix;
 static m5core2_power power;
 
 // for the LCD
-using tft_bus_t = arduino::tft_spi_ex<VSPI,5,23,-1,18,0,false,32*1024+8>;
-using lcd_t = arduino::ili9342c<15,-1,-1,tft_bus_t,1>;
+using tft_bus_t = tft_spi_ex<VSPI,5,23,-1,18,0,false,32*1024+8>;
+using lcd_t = ili9342c<15,-1,-1,tft_bus_t,1>;
 static lcd_t lcd;
 // use two 32KB buffers (DMA)
 static uint8_t lcd_transfer_buffer1[32*1024];
 static uint8_t lcd_transfer_buffer2[32*1024];
 
 // for the touch panel
-using touch_t = arduino::ft6336<280,320>;
+using touch_t = ft6336<280,320>;
 static touch_t touch(Wire1);
 
 // for the time stuff
 static bm8563 time_rtc(Wire1);
 static char time_buffer[32];
 static long time_offset = 0;
-static IPAddress time_server_ip;
 static ntp_time time_server;
 static bool time_fetching=false;
 
@@ -54,7 +52,7 @@ screen_t main_screen({320,240},sizeof(lcd_transfer_buffer1),lcd_transfer_buffer1
 svg_clock_t ana_clock(main_screen);
 label_t dig_clock(main_screen);
 canvas_t wifi_icon(main_screen);
-
+canvas_t battery_icon(main_screen);
 // for dumping to the display (UIX)
 static void lcd_flush(const rect16& bounds,const void* bmp,void* state) {
     // wrap the void* bitmap buffer with a read only (const) bitmap object - this is a light and fast op
@@ -100,6 +98,25 @@ static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* s
         draw::icon(destination,point16::zero(),faWifi,color_t::light_gray);
     }
 }
+static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
+    if(!power.ac_in()) {
+        int pct = power.battery_level();
+        const const_bitmap<alpha_pixel<8>>* ico;
+        if(pct<25) {
+            ico = &faBatteryEmpty;
+        } else if(pct<50) {
+            ico = &faBatteryQuarter;
+        } else if(pct<75) {
+            ico = &faBatteryHalf;
+        } else if(pct<100) {
+            ico = &faBatteryThreeQuarters;
+        } else {
+            ico = &faBatteryFull;
+        }
+        draw::icon(destination,point16::zero(),*ico,color_t::light_gray);
+    }
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -153,13 +170,19 @@ void setup()
     dig_clock.text_justify(uix_justify::top_middle);
     main_screen.register_control(dig_clock);
 
-    // set up a custom canvas for displaying our icon
+    // set up a custom canvas for displaying our wifi icon
     wifi_icon.bounds(
         srect16(spoint16(0,0),(ssize16)wifi_icon.dimensions())
             .offset(main_screen.dimensions().width-
                 wifi_icon.dimensions().width,0));
     wifi_icon.on_paint_callback(wifi_icon_paint);
-    main_screen.register_control(wifi_icon);
+
+    // set up a custom canvas for displaying our battery icon
+    battery_icon.bounds(
+        (srect16)faBatteryEmpty.dimensions().bounds());
+            
+    battery_icon.on_paint_callback(battery_icon_paint);
+    main_screen.register_control(battery_icon);
 }
 
 void loop()
@@ -170,6 +193,7 @@ void loop()
     static int connection_state=0;
     static uint32_t connection_refresh_ts = 0;
     static uint32_t time_ts = 0;
+    IPAddress time_server_ip;
     switch(connection_state) { 
         case 0: // idle
         if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+(time_refresh_interval*1000))) {
@@ -242,6 +266,18 @@ void loop()
         // tell the label the text changed
         dig_clock.invalidate();
     }
+    // update the battery level
+    static int bat_level = power.battery_level();
+    if((int)power.battery_level()!=bat_level) {
+        bat_level = power.battery_level();
+        battery_icon.invalidate();
+    }
+    static bool ac_in = power.ac_in();
+    if((int)power.battery_level()!=ac_in) {
+        ac_in = power.ac_in();
+        battery_icon.invalidate();
+    }
+    
     //////////////////////////
     // pump various objects
     /////////////////////////

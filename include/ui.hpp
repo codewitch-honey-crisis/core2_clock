@@ -13,6 +13,7 @@ using surface_t = screen_t::control_surface_type;
 using svg_clock_t = uix::svg_clock<surface_t>;
 using label_t = uix::label<surface_t>;
 using canvas_t = uix::canvas<surface_t>;
+
 extern screen_t main_screen;
 extern svg_clock_t ana_clock;
 extern label_t dig_clock;

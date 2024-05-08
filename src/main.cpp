@@ -101,9 +101,11 @@ static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* s
 static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
     if(!power.ac_in()) {
         int pct = power.battery_level();
+        auto px = color_t::white;
         const const_bitmap<alpha_pixel<8>>* ico;
         if(pct<25) {
             ico = &faBatteryEmpty;
+            px=color_t::red;
         } else if(pct<50) {
             ico = &faBatteryQuarter;
         } else if(pct<75) {
@@ -113,7 +115,7 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
         } else {
             ico = &faBatteryFull;
         }
-        draw::icon(destination,point16::zero(),*ico,color_t::light_gray);
+        draw::icon(destination,point16::zero(),*ico,px);
     }
 }
 
@@ -176,7 +178,8 @@ void setup()
             .offset(main_screen.dimensions().width-
                 wifi_icon.dimensions().width,0));
     wifi_icon.on_paint_callback(wifi_icon_paint);
-
+    main_screen.register_control(wifi_icon);
+    
     // set up a custom canvas for displaying our battery icon
     battery_icon.bounds(
         (srect16)faBatteryEmpty.dimensions().bounds());

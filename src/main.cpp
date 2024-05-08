@@ -98,29 +98,32 @@ static void update_time_buffer(time_t time) {
 }
 
 static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* state) {
+    // if we're using the radio, indicate it with the appropriate icon
     if(time_fetching) {
         draw::icon(destination,point16::zero(),faWifi,color_t::light_gray);
     }
 }
 static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
-    if(!power.ac_in()) {
-        int pct = power.battery_level();
-        auto px = color_t::white;
-        const const_bitmap<alpha_pixel<8>>* ico;
-        if(pct<25) {
-            ico = &faBatteryEmpty;
+    // display the appropriate icon for the battery level
+    // show in green if it's on ac power.
+    int pct = power.battery_level();
+    auto px = power.ac_in()?color_t::green:color_t::white;
+    const const_bitmap<alpha_pixel<8>>* ico;
+    if(pct<25) {
+        ico = &faBatteryEmpty;
+        if(!power.ac_in()) {
             px=color_t::red;
-        } else if(pct<50) {
-            ico = &faBatteryQuarter;
-        } else if(pct<75) {
-            ico = &faBatteryHalf;
-        } else if(pct<100) {
-            ico = &faBatteryThreeQuarters;
-        } else {
-            ico = &faBatteryFull;
         }
-        draw::icon(destination,point16::zero(),*ico,px);
+    } else if(pct<50) {
+        ico = &faBatteryQuarter;
+    } else if(pct<75) {
+        ico = &faBatteryHalf;
+    } else if(pct<100) {
+        ico = &faBatteryThreeQuarters;
+    } else {
+        ico = &faBatteryFull;
     }
+    draw::icon(destination,point16::zero(),*ico,px);
 }
 
 void setup()
@@ -146,9 +149,9 @@ void setup()
     auto px = ana_clock.second_color();
     // use pixel metadata to figure out what half of the max value is
     // and set the alpha channel (A) to that value
-    px.template channel<channel_name::A>(decltype(px)::channel_by_name<channel_name::A>::max/2);
+    px.template channel<channel_name::A>(
+        decltype(px)::channel_by_name<channel_name::A>::max/2);
     ana_clock.second_color(px);
-
     // do similar with the minute hand as the second hand
     px = ana_clock.minute_color();
     // same as above, but it handles it for you, using a scaled float

@@ -190,7 +190,6 @@ void setup()
     // set up a custom canvas for displaying our battery icon
     battery_icon.bounds(
         (srect16)faBatteryEmpty.dimensions().bounds());
-            
     battery_icon.on_paint_callback(battery_icon_paint);
     main_screen.register_control(battery_icon);
 }

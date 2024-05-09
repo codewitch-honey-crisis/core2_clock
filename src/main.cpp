@@ -183,6 +183,11 @@ void setup()
     // same as above, but it handles it for you, using a scaled float
     px.template channelr<channel_name::A>(0.5f);
     ana_clock.minute_color(px);
+    // make the whole thing dark
+    ana_clock.hour_border_color(color32_t::gray);
+    ana_clock.minute_border_color(ana_clock.hour_border_color());
+    ana_clock.face_color(color32_t::black);
+    ana_clock.tick_color(color32_t::black);
     main_screen.register_control(ana_clock);
 
     if(wifi_ssid!=nullptr) {

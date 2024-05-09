@@ -208,8 +208,8 @@ void setup()
     const uint16_t tz_top = dig_clock.bounds().y1+dig_clock.dimensions().height;
     time_zone.bounds(srect16(0,tz_top,main_screen.bounds().x2,tz_top+40));
     time_zone.text_open_font(&text_font);
-    time_zone.text_line_height(35);
-    time_zone.text_color(color32_t::white);
+    time_zone.text_line_height(30);
+    time_zone.text_color(color32_t::light_sky_blue);
     time_zone.text_justify(uix_justify::top_middle);
     main_screen.register_control(time_zone);
 

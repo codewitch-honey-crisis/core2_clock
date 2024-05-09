@@ -1,7 +1,17 @@
 #include <Arduino.h>
+#ifdef M5STACK_CORE2
 #include <m5core2_power.hpp>
+#endif
+#ifdef M5STACK_TOUGH
+#include <m5tough_power.hpp>
+#endif
 #include <bm8563.hpp>
+#ifdef M5STACK_CORE2
 #include <ft6336.hpp>
+#endif
+#ifdef M5STACK_TOUGH
+#include <chsc6540.hpp>
+#endif
 #include <tft_io.hpp>
 #include <ili9341.hpp>
 #include <uix.hpp>
@@ -25,9 +35,13 @@ using namespace arduino;
 using namespace gfx;
 using namespace uix;
 
-// for AXP192 power management (required for core2)
+// for AXP192 power management
+#ifdef M5STACK_CORE2
 static m5core2_power power;
-
+#endif
+#ifdef M5STACK_TOUGH
+static m5tough_power power;
+#endif
 // for the LCD
 using tft_bus_t = tft_spi_ex<VSPI,5,23,-1,18,0,false,32*1024+8>;
 using lcd_t = ili9342c<15,-1,-1,tft_bus_t,1>;
@@ -37,7 +51,13 @@ static uint8_t lcd_transfer_buffer1[32*1024];
 static uint8_t lcd_transfer_buffer2[32*1024];
 
 // for the touch panel
+#ifdef M5STACK_CORE2
 using touch_t = ft6336<280,320>;
+#endif
+#ifdef M5STACK_TOUGH
+using touch_t = chsc6540<320,240,39>;
+#endif
+
 static touch_t touch(Wire1);
 
 // for the time stuff

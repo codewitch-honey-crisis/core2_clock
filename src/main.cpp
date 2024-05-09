@@ -187,7 +187,8 @@ void setup()
     ana_clock.hour_border_color(color32_t::gray);
     ana_clock.minute_border_color(ana_clock.hour_border_color());
     ana_clock.face_color(color32_t::black);
-    ana_clock.tick_color(color32_t::black);
+    ana_clock.face_border_color(color32_t::black);
+    //ana_clock.tick_color(color32_t::black);
     main_screen.register_control(ana_clock);
 
     if(wifi_ssid!=nullptr) {

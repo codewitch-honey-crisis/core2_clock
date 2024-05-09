@@ -18,6 +18,7 @@ using canvas_t = uix::canvas<surface_t>;
 extern screen_t main_screen;
 extern svg_clock_t ana_clock;
 extern label_t dig_clock;
+extern label_t time_zone;
 extern canvas_t wifi_icon;
 extern canvas_t battery_icon;
 

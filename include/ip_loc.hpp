@@ -11,6 +11,8 @@ struct ip_loc final {
                     char* out_region, 
                     size_t region_size, 
                     char* out_city, 
-                    size_t city_size);
+                    size_t city_size,
+                    char* out_time_zone,
+                    size_t time_zone_size);
 };
 }

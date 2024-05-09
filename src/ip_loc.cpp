@@ -8,10 +8,12 @@ bool ip_loc::fetch(float* out_lat,
                 char* out_region, 
                 size_t region_size, 
                 char* out_city, 
-                size_t city_size) {
+                size_t city_size,
+                char* out_time_zone,
+                size_t time_zone_size) {
     // URL for IP resolution service
     constexpr static const char* url = 
-        "http://ip-api.com/csv/?fields=lat,lon,region,city,offset";
+        "http://ip-api.com/csv/?fields=lat,lon,region,city,offset,timezone";
     HTTPClient client;
     client.begin(url);
     if(0>=client.GET()) {
@@ -38,6 +40,11 @@ bool ip_loc::fetch(float* out_lat,
         *out_lon = f;
     }
     ch = stm.read();
+    str = stm.readStringUntil(',');
+    if(out_time_zone!=nullptr && time_zone_size>0) {
+         str.replace("_"," ");
+         strncpy(out_time_zone,str.c_str(),min(str.length(),time_zone_size));
+    }
     long lt = stm.parseInt();
     if(out_utc_offset!=nullptr) {
         *out_utc_offset = lt;

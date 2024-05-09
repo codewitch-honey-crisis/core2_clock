@@ -65,6 +65,7 @@ static bm8563 time_rtc(Wire1);
 static char time_buffer[32];
 static long time_offset = 0;
 static ntp_time time_server;
+static char time_zone_buffer[64];
 static bool time_fetching=false;
 
 // the screen/control definitions
@@ -75,6 +76,7 @@ screen_t main_screen(
     lcd_transfer_buffer2);
 svg_clock_t ana_clock(main_screen);
 label_t dig_clock(main_screen);
+label_t time_zone(main_screen);
 canvas_t wifi_icon(main_screen);
 canvas_t battery_icon(main_screen);
 
@@ -155,7 +157,11 @@ void setup()
     touch.rotation(0);
     time_rtc.initialize();
     Serial.println("Clock booted");
-    
+    if(power.charging()) {
+        Serial.println("Charging");
+    } else {
+        Serial.println("Not charging");
+    }
     // init the screen and callbacks
     main_screen.background_color(color_t::black);
     main_screen.on_flush_callback(lcd_flush);
@@ -198,6 +204,14 @@ void setup()
     dig_clock.text_color(color32_t::white);
     dig_clock.text_justify(uix_justify::top_middle);
     main_screen.register_control(dig_clock);
+
+    const uint16_t tz_top = dig_clock.bounds().y1+dig_clock.dimensions().height;
+    time_zone.bounds(srect16(0,tz_top,main_screen.bounds().x2,tz_top+40));
+    time_zone.text_open_font(&text_font);
+    time_zone.text_line_height(35);
+    time_zone.text_color(color32_t::white);
+    time_zone.text_justify(uix_justify::top_middle);
+    main_screen.register_control(time_zone);
 
     // set up a custom canvas for displaying our wifi icon
     wifi_icon.bounds(
@@ -260,7 +274,7 @@ void loop()
             Serial.println("Retrieving time info...");
             connection_refresh_ts = millis();
             // grabs the timezone offset based on IP
-            ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0);
+            ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer));
             WiFi.hostByName(time_server_domain,time_server_ip);
             connection_state = 4;
             time_ts = millis(); // we're going to correct for latency
@@ -274,6 +288,7 @@ void loop()
                 // set the digital clock - otherwise it only updates once a minute
                 update_time_buffer(time_rtc.now());
                 dig_clock.invalidate();
+                time_zone.text(time_zone_buffer);
                 connection_state = 0;
                 Serial.println("Turning WiFi off.");
                 WiFi.disconnect(true,false);

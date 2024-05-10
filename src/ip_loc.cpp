@@ -26,26 +26,32 @@ bool ip_loc::fetch(float* out_lat,
     strcpy(url,"http://ip-api.com/json/?fields=status");//,region,city,lat,lon,timezone,offset";
     int count = 0;
     if(out_lat!=nullptr) {
+        *out_lat = 0.0f;
         strcat(url,",lat");
         ++count;
     }
     if(out_lon!=nullptr) {
+        *out_lon = 0.0f;
         strcat(url,",lon");
         ++count;
     }
     if(out_utc_offset!=nullptr) {
+        *out_utc_offset = 0;
         strcat(url,",offset");
         ++count;
     }
     if(out_region!=nullptr && region_size>0) {
+        *out_region = 0;
         strcat(url,",region");
         ++count;
     }
     if(out_city!=nullptr && city_size>0) {
+        *out_city = 0;
         strcat(url,",city");
         ++count;
     }
     if(out_time_zone!=nullptr && time_zone_size>0) {
+        *out_time_zone = 0;
         strcat(url,",timezone");
         ++count;
     }

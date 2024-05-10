@@ -53,6 +53,14 @@ namespace arduino {
     client.end();
     return true;
 }*/
+static char* fetch_replace_char(char* str, char find, char replace){
+    char *current_pos = strchr(str,find);
+    while (current_pos) {
+        *current_pos = replace;
+        current_pos = strchr(current_pos+1,find);
+    }
+    return str;
+}
 bool ip_loc::fetch(float* out_lat,
                 float* out_lon, 
                 long* out_utc_offset, 
@@ -92,9 +100,12 @@ bool ip_loc::fetch(float* out_lat,
                 strncpy(out_city,reader.value(),city_size);
             } else if(out_time_zone!=nullptr && 0==strcmp("timezone",reader.value())) {
                 reader.read();
-                strncpy(out_time_zone,reader.value(),time_zone_size);
+                strncpy(out_time_zone, reader.value(),time_zone_size);
+                fetch_replace_char(out_time_zone,'_',' ');
             }
-
+        } else if(reader.node_type()==json::json_node_type::end_object) {
+            // don't wait for end of document to terminate the connection
+            break;
         }
     }
     client.end();

@@ -65,7 +65,7 @@ bool ip_loc::fetch(float* out_lat,
     io::arduino_stream astm(&stm);
     json::json_reader_ex<512> reader(astm);
     while(reader.read()) {
-        if(reader.node_type()==json::json_node_type::field) {
+        if(reader.depth()==1 && reader.node_type()==json::json_node_type::field) {
             if(out_lat!=nullptr && 0==strcmp("lat",reader.value())) {
                 reader.read();
                 *out_lat = reader.value_real();
@@ -78,21 +78,21 @@ bool ip_loc::fetch(float* out_lat,
                 reader.read();
                 *out_utc_offset = reader.value_int();
                 --count;
-            } else if(out_region!=nullptr && 0==strcmp("region",reader.value())) {
+            } else if(out_region!=nullptr && region_size>0 && 0==strcmp("region",reader.value())) {
                 reader.read();
                 strncpy(out_region,reader.value(),region_size);
                 --count;
-            } else if(out_city!=nullptr && 0==strcmp("city",reader.value())) {
+            } else if(out_city!=nullptr && city_size > 0 && 0==strcmp("city",reader.value())) {
                 reader.read();
                 strncpy(out_city,reader.value(),city_size);
                 --count;
-            } else if(out_time_zone!=nullptr && 0==strcmp("timezone",reader.value())) {
+            } else if(out_time_zone!=nullptr && time_zone_size>0 && 0==strcmp("timezone",reader.value())) {
                 reader.read();
                 strncpy(out_time_zone, reader.value(),time_zone_size);
                 ip_loc_fetch_replace_char(out_time_zone,'_',' ');
                 --count;
             }
-        } else if(count<1 || reader.node_type()==json::json_node_type::end_object) {
+        } else if(count<1 || reader.depth()==0) {
             // don't wait for end of document to terminate the connection
             break;
         }

@@ -66,7 +66,7 @@ static touch_t touch(Wire1);
 
 // for the time stuff
 static bm8563 time_rtc(Wire1);
-static char time_buffer[32];
+static char time_buffer[64];
 static long time_offset = 0;
 static ntp_time time_server;
 static char time_zone_buffer[64];
@@ -183,11 +183,16 @@ static void lcd_panel_init() {
 }
 // updates the time string with the current time
 static void update_time_buffer(time_t time) {
+    char sz[64];
     tm tim = *localtime(&time);
-    strftime(time_buffer, sizeof(time_buffer), "%I:%M %p", &tim);
-    if(*time_buffer=='0') {
-        *time_buffer=' ';
+    *time_buffer = 0;
+    strftime(sz, sizeof(sz), "%D ", &tim);
+    strcat(time_buffer,sz);
+    strftime(sz, sizeof(sz), "%I:%M %p", &tim);
+    if(*sz=='0') {
+        *sz=' ';
     }
+    strcat(time_buffer,sz);
 }
 
 static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* state) {
@@ -264,8 +269,7 @@ void setup()
     
     // init the digital clock, 128x40, below the analog clock
     dig_clock.bounds(
-        srect16(0,0,127,39)
-            .center_horizontal(main_screen.bounds())
+        srect16(0,0,main_screen.bounds().x2,39)
             .offset(0,128));
     update_time_buffer(time_rtc.now()); // prime the digital clock
     dig_clock.text(time_buffer);

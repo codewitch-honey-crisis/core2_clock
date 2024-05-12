@@ -133,21 +133,15 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
     int pct = power.battery_level();
     auto px = power.ac_in()?color_t::green:color_t::white;
     const const_bitmap<alpha_pixel<8>>* ico;
-    if(pct<25) {
-        ico = &faBatteryEmpty;
-        if(!power.ac_in()) {
-            px=color_t::red;
-        }
-    } else if(pct<50) {
-        ico = &faBatteryQuarter;
-    } else if(pct<75) {
-        ico = &faBatteryHalf;
-    } else if(pct<100) {
-        ico = &faBatteryThreeQuarters;
-    } else {
-        ico = &faBatteryFull;
+
+    ico = &faBatteryEmpty;
+    if(!power.ac_in() && pct<25) {
+        px=color_t::red;
     }
     draw::icon(destination,point16::zero(),*ico,px);
+    draw::filled_rectangle(destination,rect16(4,10,4+(0.26f*pct),25),px);
+    //26x12
+//(10,4)
 }
 
 void setup()

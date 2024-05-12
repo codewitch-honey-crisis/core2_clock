@@ -53,7 +53,7 @@ static uint8_t lcd_transfer_buffer2[32*1024];
 
 // for the touch panel
 #ifdef M5STACK_CORE2
-using touch_t = ft6336<280,320>;
+using touch_t = ft6336<320,280>;
 #endif
 #ifdef M5STACK_TOUGH
 using touch_t = chsc6540<320,240,39>;
@@ -68,6 +68,8 @@ static long time_offset = 0;
 static ntp_time time_server;
 static char time_zone_buffer[64];
 static bool time_fetching=false;
+
+static int connection_state = 0;
 
 // the screen/control definitions
 screen_t main_screen(
@@ -104,6 +106,9 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
     if(touch.xy(&x,&y)) {
         Serial.printf("xy: (%d,%d)\n",x,y);
         out_locations[0]=point16(x,y);
+        if(y>=main_screen.dimensions().height && connection_state == 0) {
+            connection_state = 1;
+        }
         ++*in_out_locations_size;
         if(touch.xy2(&x,&y)) {
             Serial.printf("xy2: (%d,%d)\n",x,y);
@@ -237,7 +242,6 @@ void loop()
     ///////////////////////////////////
     // manage connection and fetching
     ///////////////////////////////////
-    static int connection_state=0;
     static uint32_t connection_refresh_ts = 0;
     static uint32_t time_ts = 0;
     IPAddress time_server_ip;
@@ -246,10 +250,10 @@ void loop()
         if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+(time_refresh_interval*1000))) {
             connection_refresh_ts = millis();
             connection_state = 1;
-            time_ts = 0;
         }
         break;
         case 1: // connecting
+            time_ts = 0;
             time_fetching = true;
             wifi_icon.invalidate();
             if(WiFi.status()!=WL_CONNECTED) {

@@ -109,10 +109,6 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
     if(touch.xy(&x,&y)) {
         //Serial.printf("xy: (%d,%d)\n",x,y);
         out_locations[0]=point16(x,y);
-        // handle a touch event here since we want it to be screen-global
-        if(connection_state == 0) {
-            connection_state = 1;
-        }
         ++*in_out_locations_size;
         if(touch.xy2(&x,&y)) {
             //Serial.printf("xy2: (%d,%d)\n",x,y);
@@ -197,9 +193,11 @@ static void update_time_buffer(time_t time) {
 
 static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* state) {
     // if we're using the radio, indicate it with the appropriate icon
+    auto px = rgb_pixel<16>(3,7,3);
     if(time_fetching) {
-        draw::icon(destination,point16::zero(),faWifi,color_t::light_gray);
+        px = color_t::white;
     }
+    draw::icon(destination,point16::zero(),faWifi,px);
 }
 static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
     // show in green if it's on ac power.
@@ -299,11 +297,10 @@ void setup()
     battery_icon.bounds(
         (srect16)faBatteryEmpty.dimensions().bounds());
     battery_icon.on_paint_callback(battery_icon_paint);
-    battery_icon.on_touch_callback([](size_t locations_size, const spoint16* locations, void* state){
-        Serial.println("Battery touched");
-    },nullptr);
-    battery_icon.on_release_callback([](void* state){
-        Serial.println("Battery released");
+    wifi_icon.on_touch_callback([](size_t locations_size, const spoint16* locations, void* state){
+        if(connection_state==0) {
+            connection_state = 1;
+        }
     },nullptr);
     main_screen.register_control(battery_icon);
     rgba_pixel<32> transparent(0,0,0,0);

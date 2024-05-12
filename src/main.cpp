@@ -128,20 +128,14 @@ static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* s
     }
 }
 static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
-    // display the appropriate icon for the battery level
     // show in green if it's on ac power.
     int pct = power.battery_level();
     auto px = power.ac_in()?color_t::green:color_t::white;
-    const const_bitmap<alpha_pixel<8>>* ico;
-
-    ico = &faBatteryEmpty;
-    if(!power.ac_in() && pct<25) {
+   if(!power.ac_in() && pct<25) {
         px=color_t::red;
     }
-    draw::icon(destination,point16::zero(),*ico,px);
-    draw::filled_rectangle(destination,rect16(4,10,4+(0.26f*pct),25),px);
-    //26x12
-//(10,4)
+    draw::icon(destination,point16::zero(),faBatteryEmpty,px);
+    draw::filled_rectangle(destination,rect16(4,9,6+(0.14f*pct),14),px);
 }
 
 void setup()

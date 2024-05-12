@@ -13,8 +13,13 @@
 #ifdef M5STACK_TOUGH
 #include <chsc6540.hpp>
 #endif
-#include <tft_io.hpp>
-#include <ili9341.hpp>
+#include <driver/gpio.h>
+#include <driver/spi_master.h>
+#include <esp_lcd_panel_io.h>
+#include <esp_lcd_panel_ops.h>
+#include <esp_lcd_panel_vendor.h>
+#include <esp_lcd_panel_ili9342.h>
+
 #include <uix.hpp>
 #include <gfx.hpp>
 #include <WiFi.h>
@@ -43,10 +48,8 @@ static m5core2_power power;
 #ifdef M5STACK_TOUGH
 static m5tough_power power;
 #endif
-// for the LCD
-using tft_bus_t = tft_spi_ex<VSPI,5,23,-1,18,0,false,32*1024+8>;
-using lcd_t = ili9342c<15,-1,-1,tft_bus_t,1>;
-static lcd_t lcd;
+
+esp_lcd_panel_handle_t lcd_handle;
 // use two 32KB buffers (DMA)
 static uint8_t lcd_transfer_buffer1[32*1024];
 static uint8_t lcd_transfer_buffer2[32*1024];
@@ -83,20 +86,20 @@ label_t time_zone(main_screen);
 canvas_t wifi_icon(main_screen);
 canvas_t battery_icon(main_screen);
 
-// for dumping to the display (UIX)
-static void lcd_flush(const rect16& bounds,const void* bmp,void* state) {
-    // wrap the void* bitmap buffer with a read only (const) bitmap object
-    // this is a light and fast op
-    const const_bitmap<decltype(lcd)::pixel_type> cbmp(bounds.dimensions(),bmp);
-    // send what we just created to the display
-    draw::bitmap_async(lcd,bounds,cbmp,cbmp.bounds());
+// tell UIX the DMA transfer is complete
+static bool lcd_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t* edata, void* user_ctx) {
+    main_screen.flush_complete();
+    return true;
+}
+// tell the lcd panel api to transfer data via DMA
+static void lcd_on_flush(const rect16& bounds, const void* bmp, void* state) {
+    int x1 = bounds.x1, y1 = bounds.y1, x2 = bounds.x2 + 1, y2 = bounds.y2 + 1;
+    esp_lcd_panel_draw_bitmap(lcd_handle, x1, y1, x2, y2, (void*)bmp);
+//#ifndef LCD_DMA
+//    anim_screen.flush_complete();
+//#endif
 }
 
-// for display DMA (UIX/GFX)
-static void lcd_wait_flush(void* state) {
-    // wait for any async transfers to complete
-    lcd.wait_all_async();
-}
 // for the touch panel
 static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void* state) {
     // UIX supports multiple touch points. so does the FT6336 so we potentially have
@@ -117,6 +120,66 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
             ++*in_out_locations_size;
         }
     }
+}
+// initialize the screen using the esp panel API
+static void lcd_panel_init() {
+    spi_bus_config_t buscfg;
+    memset(&buscfg, 0, sizeof(buscfg));
+    buscfg.sclk_io_num = 18;
+    buscfg.mosi_io_num = 23;
+    buscfg.miso_io_num = -1;
+    buscfg.quadwp_io_num = -1;
+    buscfg.quadhd_io_num = -1;
+    buscfg.max_transfer_sz = sizeof(lcd_transfer_buffer1) + 8;
+
+    // Initialize the SPI bus on VSPI (SPI3)
+    spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
+
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    esp_lcd_panel_io_spi_config_t io_config;
+    memset(&io_config, 0, sizeof(io_config));
+    io_config.dc_gpio_num = 15,
+    io_config.cs_gpio_num = 5,
+    io_config.pclk_hz = 40*1000*1000,
+    io_config.lcd_cmd_bits = 8,
+    io_config.lcd_param_bits = 8,
+    io_config.spi_mode = 0,
+    io_config.trans_queue_depth = 10,
+    io_config.on_color_trans_done = lcd_flush_ready;
+    // Attach the LCD to the SPI bus
+    esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI3_HOST, &io_config, &io_handle);
+
+    lcd_handle = NULL;
+    esp_lcd_panel_dev_config_t panel_config;
+    memset(&panel_config, 0, sizeof(panel_config));
+    panel_config.reset_gpio_num = -1;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    panel_config.rgb_endian = LCD_RGB_ENDIAN_BGR;
+#else
+    panel_config.color_space = ESP_LCD_COLOR_SPACE_BGR;
+#endif
+    panel_config.bits_per_pixel = 16;
+
+    // Initialize the LCD configuration
+    esp_lcd_new_panel_ili9342(io_handle, &panel_config, &lcd_handle);
+
+    // Reset the display
+    esp_lcd_panel_reset(lcd_handle);
+
+    // Initialize LCD panel
+    esp_lcd_panel_init(lcd_handle);
+    // esp_lcd_panel_io_tx_param(io_handle, LCD_CMD_SLPOUT, NULL, 0);
+    //  Swap x and y axis (Different LCD screens may need different options)
+    esp_lcd_panel_swap_xy(lcd_handle, false);
+    esp_lcd_panel_set_gap(lcd_handle, 0, 0);
+    esp_lcd_panel_mirror(lcd_handle, false, false);
+    esp_lcd_panel_invert_color(lcd_handle, true);
+    // Turn on the screen
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    esp_lcd_panel_disp_on_off(lcd_handle, true);
+#else
+    esp_lcd_panel_disp_off(lcd_handle, false);
+#endif
 }
 // updates the time string with the current time
 static void update_time_buffer(time_t time) {
@@ -152,10 +215,9 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
 void setup()
 {
     Serial.begin(115200);
-    
-    
+
     power.initialize(); // do this first
-    lcd.initialize(); // do this next
+    lcd_panel_init(); // do this next
     touch.initialize();
     touch.rotation(0);
     time_rtc.initialize();
@@ -167,8 +229,7 @@ void setup()
     }
     // init the screen and callbacks
     main_screen.background_color(color_t::black);
-    main_screen.on_flush_callback(lcd_flush);
-    main_screen.wait_flush_callback(lcd_wait_flush);
+    main_screen.on_flush_callback(lcd_on_flush);
     main_screen.on_touch_callback(lcd_touch);
 
     // init the analog clock, 128x128

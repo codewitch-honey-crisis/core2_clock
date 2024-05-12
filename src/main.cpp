@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <SPIFFS.h>
 #ifdef M5STACK_CORE2
 #include <m5core2_power.hpp>
 #endif
@@ -88,6 +89,7 @@ static void lcd_flush(const rect16& bounds,const void* bmp,void* state) {
     // send what we just created to the display
     draw::bitmap_async(lcd,bounds,cbmp,cbmp.bounds());
 }
+
 // for display DMA (UIX/GFX)
 static void lcd_wait_flush(void* state) {
     // wait for any async transfers to complete
@@ -151,6 +153,8 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
 void setup()
 {
     Serial.begin(115200);
+    
+    
     power.initialize(); // do this first
     lcd.initialize(); // do this next
     touch.initialize();
@@ -231,6 +235,12 @@ void setup()
     battery_icon.bounds(
         (srect16)faBatteryEmpty.dimensions().bounds());
     battery_icon.on_paint_callback(battery_icon_paint);
+    battery_icon.on_touch_callback([](size_t locations_size, const spoint16* locations, void* state){
+        Serial.println("Battery touched");
+    },nullptr);
+    battery_icon.on_release_callback([](void* state){
+        Serial.println("Battery released");
+    },nullptr);
     main_screen.register_control(battery_icon);
 }
 

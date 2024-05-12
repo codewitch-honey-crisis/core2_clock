@@ -141,7 +141,11 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
         px=color_t::red;
     }
     draw::icon(destination,point16::zero(),faBatteryEmpty,px);
-    draw::filled_rectangle(destination,rect16(4,9,6+(0.14f*pct),14),px);
+    if(pct==100) {
+        draw::filled_rectangle(destination,rect16(3,7,22,16),px);
+    } else {
+        draw::filled_rectangle(destination,rect16(4,9,4+(0.18f*pct),14),px);
+   }
     
 }
 
@@ -237,6 +241,7 @@ void setup()
         Serial.println("Battery released");
     },nullptr);
     main_screen.register_control(battery_icon);
+    rgba_pixel<32> transparent(0,0,0,0);
 }
 
 void loop()

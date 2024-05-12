@@ -13,6 +13,9 @@
 #ifdef M5STACK_TOUGH
 #include <chsc6540.hpp>
 #endif
+#if defined(M5STACK_CORE2) || defined(M5STACK_TOUCH)
+
+#endif
 #include <driver/gpio.h>
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>

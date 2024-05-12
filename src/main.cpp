@@ -104,14 +104,15 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
     *in_out_locations_size = 0;
     uint16_t x,y;
     if(touch.xy(&x,&y)) {
-        Serial.printf("xy: (%d,%d)\n",x,y);
+        //Serial.printf("xy: (%d,%d)\n",x,y);
         out_locations[0]=point16(x,y);
-        if(y>=main_screen.dimensions().height && connection_state == 0) {
+        // handle a touch event here since we want it to be screen-global
+        if(connection_state == 0) {
             connection_state = 1;
         }
         ++*in_out_locations_size;
         if(touch.xy2(&x,&y)) {
-            Serial.printf("xy2: (%d,%d)\n",x,y);
+            //Serial.printf("xy2: (%d,%d)\n",x,y);
             out_locations[1]=point16(x,y);
             ++*in_out_locations_size;
         }
@@ -141,6 +142,7 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
     }
     draw::icon(destination,point16::zero(),faBatteryEmpty,px);
     draw::filled_rectangle(destination,rect16(4,9,6+(0.14f*pct),14),px);
+    
 }
 
 void setup()
@@ -338,7 +340,7 @@ void loop()
     main_screen.update();    
     // FT6336 chokes if called too quickly
     static uint32_t touch_ts = 0;
-    if(millis()>touch_ts+50) {
+    if(millis()>touch_ts+13) {
         touch_ts = millis();
         touch.update();
     }

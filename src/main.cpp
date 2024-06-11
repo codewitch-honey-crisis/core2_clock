@@ -1,21 +1,17 @@
+#if __has_include(<Arduino.h>)
 #include <Arduino.h>
-#include <SPIFFS.h>
-#ifdef M5STACK_CORE2
+#else
+#include <freertos/FreeRTOS.h>
+#include <stdint.h>
+void loop();
+static uint32_t millis() {
+    return pdTICKS_TO_MS(xTaskGetTickCount());
+}
+#endif
+#include <esp_i2c.hpp>
 #include <m5core2_power.hpp>
-#endif
-#ifdef M5STACK_TOUGH
-#include <m5tough_power.hpp>
-#endif
 #include <bm8563.hpp>
-#ifdef M5STACK_CORE2
 #include <ft6336.hpp>
-#endif
-#ifdef M5STACK_TOUGH
-#include <chsc6540.hpp>
-#endif
-#if defined(M5STACK_CORE2) || defined(M5STACK_TOUCH)
-
-#endif
 #include <driver/gpio.h>
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>
@@ -25,7 +21,7 @@
 
 #include <uix.hpp>
 #include <gfx.hpp>
-#include <WiFi.h>
+#include <wifi_manager.hpp>
 #include <ip_loc.hpp>
 #include <ntp_time.hpp>
 // font is a TTF/OTF from downloaded from fontsquirrel.com
@@ -40,17 +36,16 @@
 #include <ui.hpp>
 
 // namespace imports
+#ifdef ARDUINO
 using namespace arduino;
+#else
+using namespace esp_idf;
+#endif
 using namespace gfx;
 using namespace uix;
 
 // for AXP192 power management
-#ifdef M5STACK_CORE2
-static m5core2_power power;
-#endif
-#ifdef M5STACK_TOUGH
-static m5tough_power power;
-#endif
+static m5core2_power power(esp_i2c<1,21,22>::instance);
 
 esp_lcd_panel_handle_t lcd_handle;
 // use two 32KB buffers (DMA)
@@ -58,17 +53,14 @@ static uint8_t lcd_transfer_buffer1[32*1024];
 static uint8_t lcd_transfer_buffer2[32*1024];
 
 // for the touch panel
-#ifdef M5STACK_CORE2
 using touch_t = ft6336<320,280>;
-#endif
-#ifdef M5STACK_TOUGH
-using touch_t = chsc6540<320,240,39>;
-#endif
 
-static touch_t touch(Wire1);
+static touch_t touch(esp_i2c<1,21,22>::instance);
+
+wifi_manager wifi_man;
 
 // for the time stuff
-static bm8563 time_rtc(Wire1);
+static bm8563 time_rtc(esp_i2c<1,21,22>::instance);
 static char time_buffer[64];
 static long time_offset = 0;
 static ntp_time time_server;
@@ -98,9 +90,6 @@ static bool lcd_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io
 static void lcd_on_flush(const rect16& bounds, const void* bmp, void* state) {
     int x1 = bounds.x1, y1 = bounds.y1, x2 = bounds.x2 + 1, y2 = bounds.y2 + 1;
     esp_lcd_panel_draw_bitmap(lcd_handle, x1, y1, x2, y2, (void*)bmp);
-//#ifndef LCD_DMA
-//    anim_screen.flush_complete();
-//#endif
 }
 
 // for the touch panel
@@ -110,11 +99,9 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
     *in_out_locations_size = 0;
     uint16_t x,y;
     if(touch.xy(&x,&y)) {
-        //Serial.printf("xy: (%d,%d)\n",x,y);
         out_locations[0]=point16(x,y);
         ++*in_out_locations_size;
         if(touch.xy2(&x,&y)) {
-            //Serial.printf("xy2: (%d,%d)\n",x,y);
             out_locations[1]=point16(x,y);
             ++*in_out_locations_size;
         }
@@ -175,7 +162,7 @@ static void lcd_panel_init() {
     esp_lcd_panel_invert_color(lcd_handle, true);
     // Turn on the screen
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    esp_lcd_panel_disp_on_off(lcd_handle, true);
+    esp_lcd_panel_disp_on_off(lcd_handle, false);
 #else
     esp_lcd_panel_disp_off(lcd_handle, false);
 #endif
@@ -217,21 +204,24 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
    }
     
 }
-
+#ifdef ARDUINO
 void setup()
 {
     Serial.begin(115200);
-
+#else
+extern "C" void app_main() {
+#endif
     power.initialize(); // do this first
     lcd_panel_init(); // do this next
+    power.lcd_voltage(3.0);
     touch.initialize();
     touch.rotation(0);
     time_rtc.initialize();
-    Serial.println("Clock booted");
+    puts("Clock booted");
     if(power.charging()) {
-        Serial.println("Charging");
+        puts("Charging");
     } else {
-        Serial.println("Not charging");
+        puts("Not charging");
     }
     // init the screen and callbacks
     main_screen.background_color(color_t::black);
@@ -261,13 +251,6 @@ void setup()
     //ana_clock.tick_color(color32_t::black);
     main_screen.register_control(ana_clock);
 
-    if(wifi_ssid!=nullptr) {
-        Serial.print("Using fixed SSID and credentials: ");
-        Serial.println(wifi_ssid);
-    } else {
-        Serial.println("Using stored SSID and credentials.");
-    }
-    
     // init the digital clock, 128x40, below the analog clock
     dig_clock.bounds(
         srect16(0,0,main_screen.bounds().x2,39)
@@ -307,6 +290,13 @@ void setup()
     },nullptr);
     main_screen.register_control(battery_icon);
     rgba_pixel<32> transparent(0,0,0,0);
+
+#ifndef ARDUINO
+    while(1) {
+        loop();
+        vTaskDelay(5);
+    }
+#endif
 }
 
 void loop()
@@ -316,7 +306,6 @@ void loop()
     ///////////////////////////////////
     static uint32_t connection_refresh_ts = 0;
     static uint32_t time_ts = 0;
-    IPAddress time_server_ip;
     switch(connection_state) { 
         case 0: // idle
         if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+(time_refresh_interval*1000))) {
@@ -328,54 +317,49 @@ void loop()
             time_ts = 0;
             time_fetching = true;
             wifi_icon.invalidate();
-            if(WiFi.status()!=WL_CONNECTED) {
-                Serial.println("Connecting to network...");
-                if(wifi_ssid==nullptr) {
-                    WiFi.begin();
-                } else {
-                    WiFi.begin(wifi_ssid,wifi_pass);
-                }
+            if(wifi_man.state()!=wifi_manager_state::connected && wifi_man.state()!=wifi_manager_state::connecting) {
+                puts("Connecting to network...");
+                wifi_man.connect(wifi_ssid,wifi_pass);
                 connection_state =2;
-            } else if(WiFi.status()==WL_CONNECTED) {
+            } else if(wifi_man.state()==wifi_manager_state::connected) {
                 connection_state = 2;
             }
             break;
         case 2: // connected
-            if(WiFi.status()==WL_CONNECTED) {
-                Serial.println("Connected.");
+            if(wifi_man.state()==wifi_manager_state::connected) {
+                puts("Connected.");
                 connection_state = 3;
-            } else if(WiFi.status()==WL_CONNECT_FAILED) {
+            } else if(wifi_man.state()==wifi_manager_state::error) {
                 connection_refresh_ts = 0; // immediately try to connect again
                 connection_state = 0;
                 time_fetching = false;
             }
             break;
         case 3: // fetch
-            Serial.println("Retrieving time info...");
+            puts("Retrieving time info...");
             connection_refresh_ts = millis();
             // grabs the timezone offset based on IP
             ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer));
-            WiFi.hostByName(time_server_domain,time_server_ip);
             connection_state = 4;
             time_ts = millis(); // we're going to correct for latency
-            time_server.begin_request(time_server_ip);
+            time_server.begin_request();
             break;
         case 4: // polling for response
             if(time_server.request_received()) {
                 const int latency_offset = (millis()-time_ts)/1000;
                 time_rtc.set((time_t)(time_server.request_result()+time_offset+latency_offset));
-                Serial.println("Clock set.");
+                puts("Clock set.");
                 // set the digital clock - otherwise it only updates once a minute
                 update_time_buffer(time_rtc.now());
                 dig_clock.invalidate();
                 time_zone.text(time_zone_buffer);
                 connection_state = 0;
-                Serial.println("Turning WiFi off.");
-                WiFi.disconnect(true,false);
+                puts("Turning WiFi off.");
+                wifi_man.disconnect(true);
                 time_fetching = false;
                 wifi_icon.invalidate();
             } else if(millis()>time_ts+(wifi_fetch_timeout*1000)) {
-                Serial.println("Retrieval timed out. Retrying.");
+                puts("Retrieval timed out. Retrying.");
                 connection_state = 3;
             }
             break;

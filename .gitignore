@@ -7,3 +7,4 @@ cigen/cigen/bin/
 cigen/cigen/obj/
 cigen/.vs/
 cigen/cigen/.vs/
+include/wifi_creds.h

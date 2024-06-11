@@ -5,3 +5,4 @@
 - Auto geolocation/timezone based on IP
 - NTP for time
 - Battery meter
+- Supports ESP-IDF and Arduino

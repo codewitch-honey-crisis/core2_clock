@@ -9,9 +9,19 @@ static uint32_t millis() {
 }
 #endif
 #include <esp_i2c.hpp>
+#ifdef M5STACK_CORE2
 #include <m5core2_power.hpp>
+#endif
+#ifdef M5STACK_TOUGH
+#include <m5tough_power.hpp>
+#endif
 #include <bm8563.hpp>
+#ifdef M5STACK_CORE2
 #include <ft6336.hpp>
+#endif
+#ifdef M5STACK_TOUGH
+#include <chsc6540.hpp>
+#endif
 #include <driver/gpio.h>
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>
@@ -44,16 +54,28 @@ using namespace esp_idf;
 using namespace gfx;
 using namespace uix;
 
+#ifdef M5STACK_CORE2
 // for AXP192 power management
 static m5core2_power power(esp_i2c<1,21,22>::instance);
+#endif
+
+#ifdef M5STACK_TOUGH
+// for AXP192 power management
+static m5tough_power power(esp_i2c<1,21,22>::instance);
+#endif
 
 esp_lcd_panel_handle_t lcd_handle;
 // use two 32KB buffers (DMA)
 static uint8_t lcd_transfer_buffer1[32*1024];
 static uint8_t lcd_transfer_buffer2[32*1024];
 
+#ifdef M5STACK_CORE2
 // for the touch panel
 using touch_t = ft6336<320,280>;
+#endif
+#ifdef M5STACK_TOUGH
+using touch_t = chsc6540<320,240,39>;
+#endif
 
 static touch_t touch(esp_i2c<1,21,22>::instance);
 

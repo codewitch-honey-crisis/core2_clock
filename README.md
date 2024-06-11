@@ -6,3 +6,6 @@
 - NTP for time
 - Battery meter
 - Supports ESP-IDF and Arduino
+- Supports the M5 Stack Core 2 and the M5 Stack Tough**
+
+** doesn't charge the battery for some reason on the Tough

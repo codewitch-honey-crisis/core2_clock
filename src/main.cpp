@@ -195,20 +195,21 @@ extern "C" void app_main() {
             .offset(main_screen.dimensions().width-
                 wifi_icon.dimensions().width,0));
     wifi_icon.on_paint_callback(wifi_icon_paint);
+    wifi_icon.on_touch_callback([](size_t locations_size, 
+                                    const spoint16* locations, 
+                                    void* state){
+        if(connection_state==CS_IDLE) {
+            connection_state = CS_CONNECTING;
+        }
+    },nullptr);
     main_screen.register_control(wifi_icon);
     
     // set up a custom canvas for displaying our battery icon
     battery_icon.bounds(
         (srect16)faBatteryEmpty.dimensions().bounds());
     battery_icon.on_paint_callback(battery_icon_paint);
-    wifi_icon.on_touch_callback([](size_t locations_size, const spoint16* locations, void* state){
-        if(connection_state==CS_IDLE) {
-            connection_state = CS_CONNECTING;
-        }
-    },nullptr);
     main_screen.register_control(battery_icon);
-    rgba_pixel<32> transparent(0,0,0,0);
-
+    
     panel_set_active_screen(main_screen);
 #ifndef ARDUINO
     while(1) {
@@ -227,66 +228,80 @@ void loop()
     static uint32_t time_ts = 0;
     switch(connection_state) { 
         case CS_IDLE:
-        if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+(time_refresh_interval*1000))) {
+        if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+
+                                                    (time_refresh_interval*
+                                                        1000))) {
             connection_refresh_ts = millis();
             connection_state = CS_CONNECTING;
         }
         break;
         case CS_CONNECTING:
-            time_ts = 0;
-            time_fetching = true;
-            wifi_icon.invalidate();
-            if(wifi_man.state()!=wifi_manager_state::connected && wifi_man.state()!=wifi_manager_state::connecting) {
-                puts("Connecting to network...");
-                wifi_man.connect(wifi_ssid,wifi_pass);
-                connection_state =CS_CONNECTED;
-            } else if(wifi_man.state()==wifi_manager_state::connected) {
-                connection_state = CS_CONNECTED;
-            }
-            break;
+        time_ts = 0; // for latency correction
+        time_fetching = true; // indicate that we're fetching
+        wifi_icon.invalidate(); // tell wifi_icon to repaint
+        // if we're not in process of connecting and not connected:
+        if(wifi_man.state()!=wifi_manager_state::connected && 
+            wifi_man.state()!=wifi_manager_state::connecting) {
+            puts("Connecting to network...");
+            // connect
+            wifi_man.connect(wifi_ssid,wifi_pass);
+            connection_state =CS_CONNECTED;
+        } else if(wifi_man.state()==wifi_manager_state::connected) {
+            // if we went from connecting to connected...
+            connection_state = CS_CONNECTED;
+        }
+        break;
         case CS_CONNECTED:
-            if(wifi_man.state()==wifi_manager_state::connected) {
-                puts("Connected.");
-                connection_state = CS_FETCHING;
-            } else if(wifi_man.state()==wifi_manager_state::error) {
-                connection_refresh_ts = 0; // immediately try to connect again
-                connection_state = CS_IDLE;
-                time_fetching = false;
-            }
-            break;
+        if(wifi_man.state()==wifi_manager_state::connected) {
+            puts("Connected.");
+            connection_state = CS_FETCHING;
+        } else if(wifi_man.state()==wifi_manager_state::error) {
+            connection_refresh_ts = 0; // immediately try to connect again
+            connection_state = CS_IDLE;
+            time_fetching = false;
+        }
+        break;
         case CS_FETCHING:
-            puts("Retrieving time info...");
-            connection_refresh_ts = millis();
-            // grabs the timezone offset based on IP
-            if(!ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer))) {
-                // retry
-                connection_state = CS_IDLE;
-                connection_refresh_ts = 0;
-                break;
-            }
-            connection_state = CS_POLLING;
-            time_ts = millis(); // we're going to correct for latency
-            time_server.begin_request();
+        puts("Retrieving time info...");
+        connection_refresh_ts = millis();
+        // grabs the timezone offset based on IP
+        if(!ip_loc::fetch(nullptr,
+                            nullptr,
+                            &time_offset,
+                            nullptr,
+                            0,
+                            nullptr,
+                            0,
+                            time_zone_buffer,
+                            sizeof(time_zone_buffer))) {
+            // retry
+            connection_state = CS_FETCHING;
             break;
+        }
+        time_ts = millis(); // we're going to correct for latency
+        time_server.begin_request();
+        connection_state = CS_POLLING;
+        break;
         case CS_POLLING:
-            if(time_server.request_received()) {
-                const int latency_offset = ((millis()-time_ts)+500)/1000;
-                time_rtc.set((time_t)(time_server.request_result()+time_offset+latency_offset));
-                puts("Clock set.");
-                // set the digital clock - otherwise it only updates once a minute
-                update_time_buffer(time_rtc.now());
-                dig_clock.invalidate();
-                time_zone.text(time_zone_buffer);
-                connection_state = CS_IDLE;
-                puts("Turning WiFi off.");
-                wifi_man.disconnect(true);
-                time_fetching = false;
-                wifi_icon.invalidate();
-            } else if(millis()>time_ts+(wifi_fetch_timeout*1000)) {
-                puts("Retrieval timed out. Retrying.");
-                connection_state = CS_FETCHING;
-            }
-            break;
+        if(time_server.request_received()) {
+            const int latency_offset = ((millis()-time_ts)+500)/1000;
+            time_rtc.set((time_t)(time_server.request_result()+
+                            time_offset+latency_offset));
+            puts("Clock set.");
+            // set the digital clock - otherwise it only updates once a minute
+            update_time_buffer(time_rtc.now());
+            dig_clock.invalidate();
+            time_zone.text(time_zone_buffer);
+            connection_state = CS_IDLE;
+            puts("Turning WiFi off.");
+            wifi_man.disconnect(true);
+            time_fetching = false;
+            wifi_icon.invalidate();
+        } else if(millis()>time_ts+(wifi_fetch_timeout*1000)) {
+            puts("Retrieval timed out. Retrying.");
+            connection_state = CS_FETCHING;
+        }
+        break;
     }
     ///////////////////
     // update the UI

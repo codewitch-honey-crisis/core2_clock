@@ -19,11 +19,14 @@ using namespace arduino;
 using namespace esp_idf;
 #endif
 using namespace uix;
+
+// handle to the display
 static esp_lcd_panel_handle_t lcd_handle;
+// the transfer buffers
 uint8_t* panel_transfer_buffer1 = nullptr;
 uint8_t* panel_transfer_buffer2 = nullptr;
-
-static screen_t* lcd_active_screen = nullptr;
+// the currently active screen
+static screen_t* panel_active_screen = nullptr;
 // for the touch panel
 #ifdef M5STACK_CORE2
 using touch_t = ft6336<320,280>;
@@ -33,11 +36,12 @@ using touch_t = chsc6540<320,240,39>;
 #endif
 static touch_t touch(esp_i2c<1,21,22>::instance);
 
-
 // tell UIX the DMA transfer is complete
-static bool panel_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t* edata, void* user_ctx) {
-    if(lcd_active_screen!=nullptr) {
-        lcd_active_screen->flush_complete();
+static bool panel_flush_ready(esp_lcd_panel_io_handle_t panel_io, 
+                                esp_lcd_panel_io_event_data_t* edata, 
+                                void* user_ctx) {
+    if(panel_active_screen!=nullptr) {
+        panel_active_screen->flush_complete();
     }
     return true;
 }
@@ -48,8 +52,11 @@ static void panel_on_flush(const rect16& bounds, const void* bmp, void* state) {
 }
 
 // for the touch panel
-static void panel_on_touch(point16* out_locations,size_t* in_out_locations_size,void* state) {
-    // UIX supports multiple touch points. so does the FT6336 so we potentially have
+static void panel_on_touch(point16* out_locations,
+                            size_t* in_out_locations_size,
+                            void* state) {
+    // UIX supports multiple touch points. 
+    // so does the FT6336 so we potentially have
     // two values
     *in_out_locations_size = 0;
     uint16_t x,y;
@@ -64,21 +71,22 @@ static void panel_on_touch(point16* out_locations,size_t* in_out_locations_size,
 }
 
 void panel_set_active_screen(screen_t& new_screen) {
-    if(lcd_active_screen!=nullptr) {
-        while(lcd_active_screen->flushing()) {
+    if(panel_active_screen!=nullptr) {
+        // wait until any DMA transfer is complete
+        while(panel_active_screen->flushing()) {
             vTaskDelay(5);
         }
-        lcd_active_screen->on_flush_callback(nullptr);
-        lcd_active_screen->on_touch_callback(nullptr);
+        panel_active_screen->on_flush_callback(nullptr);
+        panel_active_screen->on_touch_callback(nullptr);
     }
+    panel_active_screen=&new_screen;
     new_screen.on_flush_callback(panel_on_flush);
     new_screen.on_touch_callback(panel_on_touch);
-    lcd_active_screen=&new_screen;
-    lcd_active_screen->invalidate();
+    panel_active_screen->invalidate();
 }
 void panel_update() {
-    if(lcd_active_screen!=nullptr) {
-        lcd_active_screen->update();    
+    if(panel_active_screen!=nullptr) {
+        panel_active_screen->update();    
     }
     // FT6336 chokes if called too quickly
     static uint32_t touch_ts = 0;

@@ -257,6 +257,7 @@ void loop()
                 // retry
                 connection_state = CS_IDLE;
                 connection_refresh_ts = 0;
+                break;
             }
             connection_state = CS_POLLING;
             time_ts = millis(); // we're going to correct for latency

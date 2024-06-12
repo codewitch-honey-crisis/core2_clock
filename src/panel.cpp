@@ -1,4 +1,4 @@
-#include "lcd.hpp"
+#include "panel.hpp"
 #include "ui.hpp"
 #include <driver/gpio.h>
 #include <driver/spi_master.h>
@@ -20,8 +20,8 @@ using namespace esp_idf;
 #endif
 using namespace uix;
 static esp_lcd_panel_handle_t lcd_handle;
-uint8_t* lcd_transfer_buffer1 = nullptr;
-uint8_t* lcd_transfer_buffer2 = nullptr;
+uint8_t* panel_transfer_buffer1 = nullptr;
+uint8_t* panel_transfer_buffer2 = nullptr;
 
 static screen_t* lcd_active_screen = nullptr;
 // for the touch panel
@@ -35,20 +35,20 @@ static touch_t touch(esp_i2c<1,21,22>::instance);
 
 
 // tell UIX the DMA transfer is complete
-static bool lcd_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t* edata, void* user_ctx) {
+static bool panel_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t* edata, void* user_ctx) {
     if(lcd_active_screen!=nullptr) {
         lcd_active_screen->flush_complete();
     }
     return true;
 }
 // tell the lcd panel api to transfer data via DMA
-static void lcd_on_flush(const rect16& bounds, const void* bmp, void* state) {
+static void panel_on_flush(const rect16& bounds, const void* bmp, void* state) {
     int x1 = bounds.x1, y1 = bounds.y1, x2 = bounds.x2 + 1, y2 = bounds.y2 + 1;
     esp_lcd_panel_draw_bitmap(lcd_handle, x1, y1, x2, y2, (void*)bmp);
 }
 
 // for the touch panel
-static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void* state) {
+static void panel_on_touch(point16* out_locations,size_t* in_out_locations_size,void* state) {
     // UIX supports multiple touch points. so does the FT6336 so we potentially have
     // two values
     *in_out_locations_size = 0;
@@ -63,7 +63,7 @@ static void lcd_touch(point16* out_locations,size_t* in_out_locations_size,void*
     }
 }
 
-void lcd_set_active_screen(screen_t& new_screen) {
+void panel_set_active_screen(screen_t& new_screen) {
     if(lcd_active_screen!=nullptr) {
         while(lcd_active_screen->flushing()) {
             vTaskDelay(5);
@@ -71,12 +71,12 @@ void lcd_set_active_screen(screen_t& new_screen) {
         lcd_active_screen->on_flush_callback(nullptr);
         lcd_active_screen->on_touch_callback(nullptr);
     }
-    new_screen.on_flush_callback(lcd_on_flush);
-    new_screen.on_touch_callback(lcd_touch);
+    new_screen.on_flush_callback(panel_on_flush);
+    new_screen.on_touch_callback(panel_on_touch);
     lcd_active_screen=&new_screen;
     lcd_active_screen->invalidate();
 }
-void lcd_update() {
+void panel_update() {
     if(lcd_active_screen!=nullptr) {
         lcd_active_screen->update();    
     }
@@ -89,10 +89,10 @@ void lcd_update() {
 }
 
 // initialize the screen using the esp panel API
-void lcd_panel_init() {
-    lcd_transfer_buffer1 = (uint8_t*)heap_caps_malloc(lcd_transfer_buffer_size,MALLOC_CAP_DMA);
-    lcd_transfer_buffer2 = (uint8_t*)heap_caps_malloc(lcd_transfer_buffer_size,MALLOC_CAP_DMA);
-    if(lcd_transfer_buffer1==nullptr||lcd_transfer_buffer2==nullptr) {
+void panel_init() {
+    panel_transfer_buffer1 = (uint8_t*)heap_caps_malloc(panel_transfer_buffer_size,MALLOC_CAP_DMA);
+    panel_transfer_buffer2 = (uint8_t*)heap_caps_malloc(panel_transfer_buffer_size,MALLOC_CAP_DMA);
+    if(panel_transfer_buffer1==nullptr||panel_transfer_buffer2==nullptr) {
         puts("Out of memory allocating transfer buffers");
         while(1) vTaskDelay(5);
     }
@@ -103,7 +103,7 @@ void lcd_panel_init() {
     buscfg.miso_io_num = -1;
     buscfg.quadwp_io_num = -1;
     buscfg.quadhd_io_num = -1;
-    buscfg.max_transfer_sz = lcd_transfer_buffer_size + 8;
+    buscfg.max_transfer_sz = panel_transfer_buffer_size + 8;
 
     // Initialize the SPI bus on VSPI (SPI3)
     spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
@@ -118,7 +118,7 @@ void lcd_panel_init() {
     io_config.lcd_param_bits = 8,
     io_config.spi_mode = 0,
     io_config.trans_queue_depth = 10,
-    io_config.on_color_trans_done = lcd_flush_ready;
+    io_config.on_color_trans_done = panel_flush_ready;
     // Attach the LCD to the SPI bus
     esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI3_HOST, &io_config, &io_handle);
 

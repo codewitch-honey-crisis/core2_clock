@@ -125,7 +125,7 @@ extern "C" void app_main() {
 #endif
     
     power.initialize(); // do this first
-    lcd_panel_init(); // do this next
+    panel_init(); // do this next
     power.lcd_voltage(3.0);
     time_rtc.initialize();
     puts("Clock booted");
@@ -136,9 +136,9 @@ extern "C" void app_main() {
     }
     // init the screen and callbacks
     main_screen.dimensions({320,240});
-    main_screen.buffer_size(lcd_transfer_buffer_size);
-    main_screen.buffer1(lcd_transfer_buffer1);
-    main_screen.buffer2(lcd_transfer_buffer2);
+    main_screen.buffer_size(panel_transfer_buffer_size);
+    main_screen.buffer1(panel_transfer_buffer1);
+    main_screen.buffer2(panel_transfer_buffer2);
     main_screen.background_color(color_t::black);
     
     // init the analog clock, 128x128
@@ -204,7 +204,7 @@ extern "C" void app_main() {
     main_screen.register_control(battery_icon);
     rgba_pixel<32> transparent(0,0,0,0);
 
-    lcd_set_active_screen(main_screen);
+    panel_set_active_screen(main_screen);
 #ifndef ARDUINO
     while(1) {
         loop();
@@ -305,5 +305,5 @@ void loop()
     // pump various objects
     /////////////////////////
     time_server.update();
-    lcd_update();
+    panel_update();
 }

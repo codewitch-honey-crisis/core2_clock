@@ -19,3 +19,17 @@ In order to compile you'll need to add a wifi_creds.h file into the include/ fol
 #define WIFI_PASS "my_pass"
 #endif
 ```
+
+Source contents
+
+- include/wifi_creds.h: TO BE PROVIDED BY YOU - contains wifi credentials
+- include/assets: embedded icons and fonts
+- include/config.hpp: basic clock configuration
+- include/panel.hpp: The display and touch panel header
+- include/ui.hpp: The user interface declarations
+
+- src/panel.cpp: The display and touch panel implementation
+- src/main.cpp: The main application logic
+
+- platformio.ini: The project configuration file
+- no_ota.csv: repartition to remove OTA to make room

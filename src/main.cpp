@@ -253,14 +253,18 @@ void loop()
             puts("Retrieving time info...");
             connection_refresh_ts = millis();
             // grabs the timezone offset based on IP
-            ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer));
+            if(!ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer))) {
+                // retry
+                connection_state = CS_IDLE;
+                connection_refresh_ts = 0;
+            }
             connection_state = CS_POLLING;
             time_ts = millis(); // we're going to correct for latency
             time_server.begin_request();
             break;
         case CS_POLLING:
             if(time_server.request_received()) {
-                const int latency_offset = (millis()-time_ts)/1000;
+                const int latency_offset = ((millis()-time_ts)+500)/1000;
                 time_rtc.set((time_t)(time_server.request_result()+time_offset+latency_offset));
                 puts("Clock set.");
                 // set the digital clock - otherwise it only updates once a minute

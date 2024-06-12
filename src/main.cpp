@@ -43,15 +43,14 @@ using namespace gfx;
 using namespace uix;
 
 #ifdef M5STACK_CORE2
-// for AXP192 power management
-static m5core2_power power(esp_i2c<1,21,22>::instance);
+using power_t = m5core2_power;
 #endif
-
 #ifdef M5STACK_TOUGH
-// for AXP192 power management
-static m5tough_power power(esp_i2c<1,21,22>::instance);
+using power_t = m5tough_power;
 #endif
 
+// for AXP192 power management
+static power_t power(esp_i2c<1,21,22>::instance);
 
 // for the time stuff
 static bm8563 time_rtc(esp_i2c<1,21,22>::instance);

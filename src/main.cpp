@@ -127,8 +127,10 @@ static void battery_icon_paint(surface_t& destination,
 #ifdef ARDUINO
 void setup() {
     Serial.begin(115200);
+    printf("Arduino version: %d.%d.%d\n",ESP_ARDUINO_VERSION_MAJOR,ESP_ARDUINO_VERSION_MINOR,ESP_ARDUINO_VERSION_PATCH);
 #else
 extern "C" void app_main() {
+    printf("ESP-IDF version: %d.%d.%d\n",ESP_IDF_VERSION_MAJOR,ESP_IDF_VERSION_MINOR,ESP_IDF_VERSION_PATCH);
 #endif
     power.initialize(); // do this first
     panel_init(); // do this next

@@ -285,7 +285,7 @@ void loop()
         break;
         case CS_POLLING:
         if(time_server.request_received()) {
-            const int latency_offset = ((millis()-time_ts)+500)/1000;
+            const int latency_offset = (millis()-time_ts)/1000;
             time_rtc.set((time_t)(time_server.request_result()+
                             time_offset+latency_offset));
             puts("Clock set.");

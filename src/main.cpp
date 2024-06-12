@@ -57,7 +57,6 @@ static char time_buffer[64];
 static long time_offset = 0;
 static ntp_time time_server;
 static char time_zone_buffer[64];
-static bool time_fetching=false;
 
 // connection state for our state machine
 typedef enum {
@@ -99,6 +98,7 @@ static void wifi_icon_paint(surface_t& destination,
     // if we're using the radio, indicate it 
     // with white. otherwise dark gray
     auto px = rgb_pixel<16>(3,6,3);
+    const bool time_fetching = wifi_man.state()==wifi_manager_state::connecting || wifi_man.state()==wifi_manager_state::connected;
     if(time_fetching) {
         px = color_t::white;
     }
@@ -239,7 +239,6 @@ void loop()
         break;
         case CS_CONNECTING:
         time_ts = 0; // for latency correction
-        time_fetching = true; // indicate that we're fetching
         wifi_icon.invalidate(); // tell wifi_icon to repaint
         // if we're not in process of connecting and not connected:
         if(wifi_man.state()!=wifi_manager_state::connected && 
@@ -260,7 +259,6 @@ void loop()
         } else if(wifi_man.state()==wifi_manager_state::error) {
             connection_refresh_ts = 0; // immediately try to connect again
             connection_state = CS_IDLE;
-            time_fetching = false;
         }
         break;
         case CS_FETCHING:
@@ -297,7 +295,6 @@ void loop()
             connection_state = CS_IDLE;
             puts("Turning WiFi off.");
             wifi_man.disconnect(true);
-            time_fetching = false;
             wifi_icon.invalidate();
         } else if(millis()>time_ts+(wifi_fetch_timeout*1000)) {
             puts("Retrieval timed out. Retrying.");

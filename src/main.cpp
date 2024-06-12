@@ -16,7 +16,6 @@ static uint32_t millis() {
 #include <m5tough_power.hpp>
 #endif
 #include <bm8563.hpp>
-
 #include <uix.hpp>
 #include <gfx.hpp>
 #include <wifi_manager.hpp>

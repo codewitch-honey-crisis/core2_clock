@@ -8,47 +8,39 @@ static uint32_t millis() {
     return pdTICKS_TO_MS(xTaskGetTickCount());
 }
 #endif
-#include <esp_i2c.hpp>
+#include <esp_i2c.hpp> // i2c initialization
 #ifdef M5STACK_CORE2
-#include <m5core2_power.hpp>
+#include <m5core2_power.hpp> // AXP192 power management (core2)
 #endif
 #ifdef M5STACK_TOUGH
-#include <m5tough_power.hpp>
+#include <m5tough_power.hpp> // AXP192 power management (tough)
 #endif
-#include <bm8563.hpp>
-#include <uix.hpp>
-#include <gfx.hpp>
-#include <wifi_manager.hpp>
-#include <ip_loc.hpp>
-#include <ntp_time.hpp>
+#include <bm8563.hpp> // real-time clock
+#include <uix.hpp> // user interface library
+#include <gfx.hpp> // graphics library
+#include <wifi_manager.hpp> // wifi connection management
+#include <ip_loc.hpp> // ip geolocation service
+#include <ntp_time.hpp> // NTP client service
 // font is a TTF/OTF from downloaded from fontsquirrel.com
 // converted to a header with https://honeythecodewitch.com/gfx/converter
 #define OPENSANS_REGULAR_IMPLEMENTATION
-#include "assets/OpenSans_Regular.hpp"
-// faWifi icon generated using https://honeythecodewitch.com/gfx/iconPack
+#include "assets/OpenSans_Regular.hpp" // our font
+// icons generated using https://honeythecodewitch.com/gfx/iconPack
 #define ICONS_IMPLEMENTATION
-#include "assets/icons.hpp"
+#include "assets/icons.hpp" // our icons
 // include this after everything else except ui.hpp
-#include "config.hpp"
-#include "ui.hpp"
-#include "panel.hpp"
+#include "config.hpp" // time and font configuration
+#include "ui.hpp" // ui declarations
+#include "panel.hpp" // display panel functionality
 
 // namespace imports
 #ifdef ARDUINO
-using namespace arduino;
+using namespace arduino; // libs (arduino)
 #else
-using namespace esp_idf;
+using namespace esp_idf; // libs (idf)
 #endif
-using namespace gfx;
-using namespace uix;
-
-typedef enum {
-    CS_IDLE,
-    CS_CONNECTING,
-    CS_CONNECTED,
-    CS_FETCHING,
-    CS_POLLING
-} connection_state_t;
+using namespace gfx; // graphics
+using namespace uix; // user interface
 
 #ifdef M5STACK_CORE2
 using power_t = m5core2_power;
@@ -56,7 +48,6 @@ using power_t = m5core2_power;
 #ifdef M5STACK_TOUGH
 using power_t = m5tough_power;
 #endif
-
 // for AXP192 power management
 static power_t power(esp_i2c<1,21,22>::instance);
 
@@ -68,6 +59,14 @@ static ntp_time time_server;
 static char time_zone_buffer[64];
 static bool time_fetching=false;
 
+// connection state for our state machine
+typedef enum {
+    CS_IDLE,
+    CS_CONNECTING,
+    CS_CONNECTED,
+    CS_FETCHING,
+    CS_POLLING
+} connection_state_t;
 static connection_state_t connection_state = CS_IDLE;
 
 static wifi_manager wifi_man;
@@ -94,28 +93,36 @@ static void update_time_buffer(time_t time) {
     strcat(time_buffer,sz);
 }
 
-static void wifi_icon_paint(surface_t& destination, const srect16& clip, void* state) {
-    // if we're using the radio, indicate it with the appropriate icon
-    auto px = rgb_pixel<16>(3,7,3);
+static void wifi_icon_paint(surface_t& destination, 
+                            const srect16& clip, 
+                            void* state) {
+    // if we're using the radio, indicate it 
+    // with white. otherwise dark gray
+    auto px = rgb_pixel<16>(3,6,3);
     if(time_fetching) {
         px = color_t::white;
     }
     draw::icon(destination,point16::zero(),faWifi,px);
 }
-static void battery_icon_paint(surface_t& destination, const srect16& clip, void* state) {
+static void battery_icon_paint(surface_t& destination, 
+                                const srect16& clip, 
+                                void* state) {
     // show in green if it's on ac power.
     int pct = power.battery_level();
     auto px = power.ac_in()?color_t::green:color_t::white;
    if(!power.ac_in() && pct<25) {
         px=color_t::red;
     }
+    // draw an empty battery
     draw::icon(destination,point16::zero(),faBatteryEmpty,px);
+    // now fill it up
     if(pct==100) {
+        // if we're at 100% fill the entire thing
         draw::filled_rectangle(destination,rect16(3,7,22,16),px);
     } else {
+        // otherwise leave a small border
         draw::filled_rectangle(destination,rect16(4,9,4+(0.18f*pct),14),px);
    }
-    
 }
 #ifdef ARDUINO
 void setup() {
@@ -123,7 +130,6 @@ void setup() {
 #else
 extern "C" void app_main() {
 #endif
-    
     power.initialize(); // do this first
     panel_init(); // do this next
     power.lcd_voltage(3.0);
@@ -161,10 +167,9 @@ extern "C" void app_main() {
     ana_clock.minute_border_color(ana_clock.hour_border_color());
     ana_clock.face_color(color32_t::black);
     ana_clock.face_border_color(color32_t::black);
-    //ana_clock.tick_color(color32_t::black);
     main_screen.register_control(ana_clock);
 
-    // init the digital clock, 128x40, below the analog clock
+    // init the digital clock, (screen-width)x40, below the analog clock
     dig_clock.bounds(
         srect16(0,0,main_screen.bounds().x2,39)
             .offset(0,128));

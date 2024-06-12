@@ -296,7 +296,7 @@ void loop()
         battery_icon.invalidate();
     }
     static bool ac_in = power.ac_in();
-    if((int)power.battery_level()!=ac_in) {
+    if((int)power.ac_in()!=ac_in) {
         ac_in = power.ac_in();
         battery_icon.invalidate();
     }

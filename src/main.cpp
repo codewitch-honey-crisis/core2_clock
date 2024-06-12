@@ -42,6 +42,14 @@ using namespace esp_idf;
 using namespace gfx;
 using namespace uix;
 
+typedef enum {
+    CS_IDLE,
+    CS_CONNECTING,
+    CS_CONNECTED,
+    CS_FETCHING,
+    CS_POLLING
+} connection_state_t;
+
 #ifdef M5STACK_CORE2
 using power_t = m5core2_power;
 #endif
@@ -60,7 +68,7 @@ static ntp_time time_server;
 static char time_zone_buffer[64];
 static bool time_fetching=false;
 
-static int connection_state = 0;
+static connection_state_t connection_state = CS_IDLE;
 
 static wifi_manager wifi_man;
 
@@ -189,8 +197,8 @@ extern "C" void app_main() {
         (srect16)faBatteryEmpty.dimensions().bounds());
     battery_icon.on_paint_callback(battery_icon_paint);
     wifi_icon.on_touch_callback([](size_t locations_size, const spoint16* locations, void* state){
-        if(connection_state==0) {
-            connection_state = 1;
+        if(connection_state==CS_IDLE) {
+            connection_state = CS_CONNECTING;
         }
     },nullptr);
     main_screen.register_control(battery_icon);
@@ -213,44 +221,44 @@ void loop()
     static uint32_t connection_refresh_ts = 0;
     static uint32_t time_ts = 0;
     switch(connection_state) { 
-        case 0: // idle
+        case CS_IDLE:
         if(connection_refresh_ts==0 || millis() > (connection_refresh_ts+(time_refresh_interval*1000))) {
             connection_refresh_ts = millis();
-            connection_state = 1;
+            connection_state = CS_CONNECTING;
         }
         break;
-        case 1: // connecting
+        case CS_CONNECTING:
             time_ts = 0;
             time_fetching = true;
             wifi_icon.invalidate();
             if(wifi_man.state()!=wifi_manager_state::connected && wifi_man.state()!=wifi_manager_state::connecting) {
                 puts("Connecting to network...");
                 wifi_man.connect(wifi_ssid,wifi_pass);
-                connection_state =2;
+                connection_state =CS_CONNECTED;
             } else if(wifi_man.state()==wifi_manager_state::connected) {
-                connection_state = 2;
+                connection_state = CS_CONNECTED;
             }
             break;
-        case 2: // connected
+        case CS_CONNECTED:
             if(wifi_man.state()==wifi_manager_state::connected) {
                 puts("Connected.");
-                connection_state = 3;
+                connection_state = CS_FETCHING;
             } else if(wifi_man.state()==wifi_manager_state::error) {
                 connection_refresh_ts = 0; // immediately try to connect again
-                connection_state = 0;
+                connection_state = CS_IDLE;
                 time_fetching = false;
             }
             break;
-        case 3: // fetch
+        case CS_FETCHING:
             puts("Retrieving time info...");
             connection_refresh_ts = millis();
             // grabs the timezone offset based on IP
             ip_loc::fetch(nullptr,nullptr,&time_offset,nullptr,0,nullptr,0,time_zone_buffer,sizeof(time_zone_buffer));
-            connection_state = 4;
+            connection_state = CS_POLLING;
             time_ts = millis(); // we're going to correct for latency
             time_server.begin_request();
             break;
-        case 4: // polling for response
+        case CS_POLLING:
             if(time_server.request_received()) {
                 const int latency_offset = (millis()-time_ts)/1000;
                 time_rtc.set((time_t)(time_server.request_result()+time_offset+latency_offset));
@@ -259,14 +267,14 @@ void loop()
                 update_time_buffer(time_rtc.now());
                 dig_clock.invalidate();
                 time_zone.text(time_zone_buffer);
-                connection_state = 0;
+                connection_state = CS_IDLE;
                 puts("Turning WiFi off.");
                 wifi_man.disconnect(true);
                 time_fetching = false;
                 wifi_icon.invalidate();
             } else if(millis()>time_ts+(wifi_fetch_timeout*1000)) {
                 puts("Retrieval timed out. Retrying.");
-                connection_state = 3;
+                connection_state = CS_FETCHING;
             }
             break;
     }

@@ -98,7 +98,8 @@ static void wifi_icon_paint(surface_t& destination,
     // if we're using the radio, indicate it 
     // with white. otherwise dark gray
     auto px = rgb_pixel<16>(3,6,3);
-    const bool time_fetching = wifi_man.state()==wifi_manager_state::connecting || wifi_man.state()==wifi_manager_state::connected;
+    const bool time_fetching = wifi_man.state()==wifi_manager_state::connecting || 
+        wifi_man.state()==wifi_manager_state::connected;
     if(time_fetching) {
         px = color_t::white;
     }

@@ -21,4 +21,3 @@ extern label_t dig_clock;
 extern label_t time_zone;
 extern canvas_t wifi_icon;
 extern canvas_t battery_icon;
-

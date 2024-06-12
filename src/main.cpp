@@ -31,7 +31,7 @@ static uint32_t millis() {
 // include this after everything else except ui.hpp
 #include "config.hpp"
 #include "ui.hpp"
-#include "lcd.hpp"
+#include "panel.hpp"
 
 // namespace imports
 #ifdef ARDUINO

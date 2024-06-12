@@ -66,20 +66,18 @@ static m5tough_power power(esp_i2c<1,21,22>::instance);
 
 esp_lcd_panel_handle_t lcd_handle;
 // use two 32KB buffers (DMA)
-static uint8_t lcd_transfer_buffer1[32*1024];
-static uint8_t lcd_transfer_buffer2[32*1024];
+static constexpr const size_t lcd_transfer_buffer_size = 32*1024;
+static uint8_t* lcd_transfer_buffer1;
+static uint8_t* lcd_transfer_buffer2;
 
-#ifdef M5STACK_CORE2
 // for the touch panel
+#ifdef M5STACK_CORE2
 using touch_t = ft6336<320,280>;
 #endif
 #ifdef M5STACK_TOUGH
 using touch_t = chsc6540<320,240,39>;
 #endif
-
 static touch_t touch(esp_i2c<1,21,22>::instance);
-
-wifi_manager wifi_man;
 
 // for the time stuff
 static bm8563 time_rtc(esp_i2c<1,21,22>::instance);
@@ -91,12 +89,10 @@ static bool time_fetching=false;
 
 static int connection_state = 0;
 
+wifi_manager wifi_man;
+
 // the screen/control definitions
-screen_t main_screen(
-    {320,240},
-    sizeof(lcd_transfer_buffer1),
-    lcd_transfer_buffer1,
-    lcd_transfer_buffer2);
+screen_t main_screen;
 svg_clock_t ana_clock(main_screen);
 label_t dig_clock(main_screen);
 label_t time_zone(main_screen);
@@ -138,7 +134,7 @@ static void lcd_panel_init() {
     buscfg.miso_io_num = -1;
     buscfg.quadwp_io_num = -1;
     buscfg.quadhd_io_num = -1;
-    buscfg.max_transfer_sz = sizeof(lcd_transfer_buffer1) + 8;
+    buscfg.max_transfer_sz = lcd_transfer_buffer_size + 8;
 
     // Initialize the SPI bus on VSPI (SPI3)
     spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
@@ -227,12 +223,17 @@ static void battery_icon_paint(surface_t& destination, const srect16& clip, void
     
 }
 #ifdef ARDUINO
-void setup()
-{
+void setup() {
     Serial.begin(115200);
 #else
 extern "C" void app_main() {
 #endif
+    lcd_transfer_buffer1 = (uint8_t*)heap_caps_malloc(lcd_transfer_buffer_size,MALLOC_CAP_DMA);
+    lcd_transfer_buffer2 = (uint8_t*)heap_caps_malloc(lcd_transfer_buffer_size,MALLOC_CAP_DMA);
+    if(lcd_transfer_buffer1==nullptr||lcd_transfer_buffer2==nullptr) {
+        puts("Out of memory allocating transfer buffers");
+        while(1) vTaskDelay(5);
+    }
     power.initialize(); // do this first
     lcd_panel_init(); // do this next
     power.lcd_voltage(3.0);
@@ -246,6 +247,10 @@ extern "C" void app_main() {
         puts("Not charging");
     }
     // init the screen and callbacks
+    main_screen.dimensions({320,240});
+    main_screen.buffer_size(lcd_transfer_buffer_size);
+    main_screen.buffer1(lcd_transfer_buffer1);
+    main_screen.buffer2(lcd_transfer_buffer2);
     main_screen.background_color(color_t::black);
     main_screen.on_flush_callback(lcd_on_flush);
     main_screen.on_touch_callback(lcd_touch);

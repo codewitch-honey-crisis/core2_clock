@@ -323,10 +323,14 @@ void loop()
         break;
         case CS_POLLING:
         if(time_server.request_received()) {
-            const int latency_offset = (millis()-time_ts)/1000;
+            int latency_offset = 0;
+            if(millis()>time_ts) {
+                latency_offset = (millis()-time_ts)/1000;
+            }
             time_rtc.set((time_t)(time_server.request_result()+
                             time_offset+latency_offset));
             puts("Clock set.");
+            time_ts = 0;
             // set the digital clock - otherwise it only updates once a minute
             update_time_info(time_rtc.now());
             dig_clock.text(time_datetime);

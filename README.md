@@ -10,6 +10,9 @@
 
 ** doesn't charge the battery for some reason on the Tough
 
+Article: https://www.codeproject.com/Articles/5383716/Core-2-Clock-A-dive-into-my-IoT-ecosystem
+
+
 In order to compile you'll need to add a wifi_creds.h file into the include/ folder.
 
 ```cpp

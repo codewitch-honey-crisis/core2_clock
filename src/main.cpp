@@ -53,10 +53,11 @@ static power_t power(esp_i2c<1,21,22>::instance);
 
 // for the time stuff
 static bm8563 time_rtc(esp_i2c<1,21,22>::instance);
-static char time_buffer[64];
+static char time_datetime[64];
 static long time_offset = 0;
 static ntp_time time_server;
-static char time_zone_buffer[64];
+static char time_timezone[64];
+static char time_weekday[32];
 
 // connection state for our state machine
 typedef enum {
@@ -73,23 +74,47 @@ static wifi_manager wifi_man;
 // the screen/control definitions
 screen_t main_screen;
 svg_clock_t ana_clock(main_screen);
+label_t weekday(main_screen);
 label_t dig_clock(main_screen);
-label_t time_zone(main_screen);
+label_t timezone(main_screen);
 canvas_t wifi_icon(main_screen);
 canvas_t battery_icon(main_screen);
 
 // updates the time string with the current time
-static void update_time_buffer(time_t time) {
+static void update_time_info(time_t time) {
     char sz[64];
     tm tim = *localtime(&time);
-    *time_buffer = 0;
+    *time_datetime = 0;
     strftime(sz, sizeof(sz), "%D ", &tim);
-    strcat(time_buffer,sz);
+    strcat(time_datetime,sz);
     strftime(sz, sizeof(sz), "%I:%M %p", &tim);
     if(*sz=='0') {
         *sz=' ';
     }
-    strcat(time_buffer,sz);
+    strcat(time_datetime,sz);
+    switch(tim.tm_wday) {
+        case 0:
+            strcpy(time_weekday,"Sunday");
+            break;
+        case 1:
+            strcpy(time_weekday,"Monday");
+            break;
+        case 2:
+            strcpy(time_weekday,"Tuesday");
+            break;
+        case 3:
+            strcpy(time_weekday,"Wednesday");
+            break;
+        case 4:
+            strcpy(time_weekday,"Thursday");
+            break;
+        case 5:
+            strcpy(time_weekday,"Friday");
+            break;
+        default: // 6
+            strcpy(time_weekday,"Saturday");
+            break;
+    }
 }
 
 static void wifi_icon_paint(surface_t& destination, 
@@ -171,13 +196,25 @@ extern "C" void app_main() {
     ana_clock.face_color(color32_t::black);
     ana_clock.face_border_color(color32_t::black);
     main_screen.register_control(ana_clock);
-
-    // init the digital clock, (screen-width)x40, below the analog clock
-    dig_clock.bounds(
+    
+    update_time_info(time_rtc.now()); // prime the digital clock
+    
+    // init the weekday, (screen-width)x40, below the analog clock
+    weekday.bounds(
         srect16(0,0,main_screen.bounds().x2,39)
             .offset(0,128));
-    update_time_buffer(time_rtc.now()); // prime the digital clock
-    dig_clock.text(time_buffer);
+    update_time_info(time_rtc.now()); // prime the digital clock
+    weekday.text(time_weekday);
+    weekday.text_open_font(&text_font);
+    weekday.text_line_height(35);
+    weekday.text_color(color32_t::white);
+    weekday.text_justify(uix_justify::top_middle);
+    main_screen.register_control(weekday);
+    // init the digital clock, (screen-width)x40, below the weekday
+    dig_clock.bounds(
+        srect16(0,0,main_screen.bounds().x2,39)
+            .offset(0,128+weekday.text_line_height()));
+    dig_clock.text(time_datetime);
     dig_clock.text_open_font(&text_font);
     dig_clock.text_line_height(35);
     dig_clock.text_color(color32_t::white);
@@ -185,12 +222,12 @@ extern "C" void app_main() {
     main_screen.register_control(dig_clock);
 
     const uint16_t tz_top = dig_clock.bounds().y1+dig_clock.dimensions().height;
-    time_zone.bounds(srect16(0,tz_top,main_screen.bounds().x2,tz_top+40));
-    time_zone.text_open_font(&text_font);
-    time_zone.text_line_height(30);
-    time_zone.text_color(color32_t::light_sky_blue);
-    time_zone.text_justify(uix_justify::top_middle);
-    main_screen.register_control(time_zone);
+    timezone.bounds(srect16(0,tz_top,main_screen.bounds().x2,tz_top+40));
+    timezone.text_open_font(&text_font);
+    timezone.text_line_height(30);
+    timezone.text_color(color32_t::light_sky_blue);
+    timezone.text_justify(uix_justify::top_middle);
+    main_screen.register_control(timezone);
 
     // set up a custom canvas for displaying our wifi icon
     wifi_icon.bounds(
@@ -273,8 +310,8 @@ void loop()
                             0,
                             nullptr,
                             0,
-                            time_zone_buffer,
-                            sizeof(time_zone_buffer))) {
+                            time_timezone,
+                            sizeof(time_timezone))) {
             // retry
             connection_state = CS_FETCHING;
             break;
@@ -290,9 +327,10 @@ void loop()
                             time_offset+latency_offset));
             puts("Clock set.");
             // set the digital clock - otherwise it only updates once a minute
-            update_time_buffer(time_rtc.now());
+            update_time_info(time_rtc.now());
             dig_clock.invalidate();
-            time_zone.text(time_zone_buffer);
+            weekday.invalidate();
+            timezone.text(time_timezone);
             connection_state = CS_IDLE;
             puts("Turning WiFi off.");
             wifi_man.disconnect(true);
@@ -310,8 +348,9 @@ void loop()
     ana_clock.time(time);
     // only update every minute (efficient)
     if(0==(time%60)) {
-        update_time_buffer(time);
-        // tell the label the text changed
+        update_time_info(time);
+        // tell the labels the text changed
+        weekday.invalidate();
         dig_clock.invalidate();
     }
     // update the battery level

@@ -17,7 +17,8 @@ using canvas_t = uix::canvas<surface_t>;
 // the screen/control declarations
 extern screen_t main_screen;
 extern svg_clock_t ana_clock;
+extern label_t weekday;
 extern label_t dig_clock;
-extern label_t time_zone;
+extern label_t timezone;
 extern canvas_t wifi_icon;
 extern canvas_t battery_icon;

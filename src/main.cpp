@@ -57,8 +57,8 @@ static char time_datetime[64];
 static long time_offset = 0;
 static ntp_time time_server;
 static char time_timezone[64];
-static char time_weekday[32];
-
+static char time_weekday[16];
+static char time_city[64]; // primarily for debugging
 // connection state for our state machine
 typedef enum {
     CS_IDLE,
@@ -308,14 +308,15 @@ void loop()
                             &time_offset,
                             nullptr,
                             0,
-                            nullptr,
-                            0,
+                            time_city,
+                            sizeof(time_city),
                             time_timezone,
                             sizeof(time_timezone))) {
             // retry
             connection_state = CS_FETCHING;
             break;
         }
+        puts(time_city);
         time_ts = millis(); // we're going to correct for latency
         time_server.begin_request();
         connection_state = CS_POLLING;
@@ -349,9 +350,12 @@ void loop()
     // only update every minute (efficient)
     if(0==(time%60)) {
         update_time_info(time);
-        // tell the labels the text changed
-        weekday.invalidate();
+        // tell the label the text changed
         dig_clock.invalidate();
+    }
+    // only update once a day
+    if(0==(time%(60*60*24))) {
+        weekday.invalidate();
     }
     // update the battery level
     static int bat_level = power.battery_level();

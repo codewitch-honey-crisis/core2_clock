@@ -329,8 +329,8 @@ void loop()
             puts("Clock set.");
             // set the digital clock - otherwise it only updates once a minute
             update_time_info(time_rtc.now());
-            dig_clock.invalidate();
-            weekday.invalidate();
+            dig_clock.text(time_datetime);
+            weekday.text(time_weekday);
             timezone.text(time_timezone);
             connection_state = CS_IDLE;
             puts("Turning WiFi off.");
@@ -351,11 +351,11 @@ void loop()
     if(0==(time%60)) {
         update_time_info(time);
         // tell the label the text changed
-        dig_clock.invalidate();
+        dig_clock.text(time_datetime);
     }
     // only update once a day
     if(0==(time%(60*60*24))) {
-        weekday.invalidate();
+        weekday.text(time_weekday);
     }
     // update the battery level
     static int bat_level = power.battery_level();

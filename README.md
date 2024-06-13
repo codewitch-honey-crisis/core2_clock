@@ -32,4 +32,4 @@ Source contents
 - src/main.cpp: The main application logic
 
 - platformio.ini: The project configuration file
-- no_ota.csv: repartition to remove OTA to make room
+- 16MB.csv: set the Core2/Tough partitions to the correct settings

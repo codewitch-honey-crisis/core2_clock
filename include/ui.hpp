@@ -229,6 +229,9 @@ protected:
                 if(gfx::gfx_result::success==cvs.initialize()) {
                     gfx::draw::canvas(bmp,cvs,gfx::point16::zero());
                     if(gfx::gfx_result::success==draw_clock_face(cvs)) {
+                        if(m_face_buffer.begin()!=nullptr) {
+                            free(m_face_buffer.begin());
+                        }
                         m_face_buffer = bmp;
                         m_face_dirty = false;
                     }

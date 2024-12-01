@@ -159,7 +159,7 @@ void panel_init() {
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     esp_lcd_panel_disp_on_off(lcd_handle, true);
 #else
-    esp_lcd_panel_disp_off(lcd_handle, true);
+    esp_lcd_panel_disp_off(lcd_handle, false);
 #endif
     touch.initialize();
     touch.rotation(0);

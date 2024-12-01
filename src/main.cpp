@@ -24,10 +24,10 @@ static uint32_t millis() {
 // font is a TTF/OTF from downloaded from fontsquirrel.com
 // converted to a header with https://honeythecodewitch.com/gfx/converter
 #define OPENSANS_REGULAR_IMPLEMENTATION
-#include "assets/OpenSans_Regular.hpp" // our font
+#include "assets/OpenSans_Regular.h" // our font
 // icons generated using https://honeythecodewitch.com/gfx/iconPack
 #define ICONS_IMPLEMENTATION
-#include "assets/icons.hpp" // our icons
+#include "assets/icons.h" // our icons
 // include this after everything else except ui.hpp
 #include "config.hpp" // time and font configuration
 #include "ui.hpp" // ui declarations
@@ -59,6 +59,13 @@ static ntp_time time_server;
 static char time_timezone[64];
 static char time_weekday[16];
 static char time_city[64]; // primarily for debugging
+
+// assets
+static const const_bitmap<alpha_pixel<8>> faBatteryEmptyIco({faBatteryEmpty_size.width,faBatteryEmpty_size.height},faBatteryEmpty);
+static const const_bitmap<alpha_pixel<8>> faWifiIco({faWifi_size.width,faWifi_size.height},faWifi);
+static const_buffer_stream text_font_stream(OpenSans_Regular,sizeof(OpenSans_Regular));
+tt_font text_font35(text_font_stream,35,font_size_units::px);
+tt_font text_font30(text_font_stream,30,font_size_units::px);
 // connection state for our state machine
 typedef enum {
     CS_IDLE,
@@ -73,12 +80,12 @@ static wifi_manager wifi_man;
 
 // the screen/control definitions
 screen_t main_screen;
-svg_clock_t ana_clock(main_screen);
-label_t weekday(main_screen);
-label_t dig_clock(main_screen);
-label_t timezone(main_screen);
-canvas_t wifi_icon(main_screen);
-canvas_t battery_icon(main_screen);
+vclock_t ana_clock;
+label_t weekday;
+label_t dig_clock;
+label_t timezone;
+painter_t wifi_icon;
+painter_t battery_icon;
 
 // updates the time string with the current time
 static void update_time_info(time_t time) {
@@ -128,7 +135,7 @@ static void wifi_icon_paint(surface_t& destination,
     if(time_fetching) {
         px = color_t::white;
     }
-    draw::icon(destination,point16::zero(),faWifi,px);
+    draw::icon(destination,point16::zero(),faWifiIco,px);
 }
 static void battery_icon_paint(surface_t& destination, 
                                 const srect16& clip, 
@@ -140,7 +147,7 @@ static void battery_icon_paint(surface_t& destination,
         px=color_t::red;
     }
     // draw an empty battery
-    draw::icon(destination,point16::zero(),faBatteryEmpty,px);
+    draw::icon(destination,point16::zero(),faBatteryEmptyIco,px);
     // now fill it up
     if(pct==100) {
         // if we're at 100% fill the entire thing
@@ -168,6 +175,8 @@ extern "C" void app_main() {
     } else {
         puts("Not charging"); // M5 Tough doesn't charge!?
     }
+    text_font35.initialize();
+    text_font30.initialize();
     // init the screen and callbacks
     main_screen.dimensions({320,240});
     main_screen.buffer_size(panel_transfer_buffer_size);
@@ -182,7 +191,7 @@ extern "C" void app_main() {
     auto px = ana_clock.second_color();
     // use pixel metadata to figure out what half of the max value is
     // and set the alpha channel (A) to that value
-    px.template channel<channel_name::A>(
+    px.channel<channel_name::A>(
         decltype(px)::channel_by_name<channel_name::A>::max/2);
     ana_clock.second_color(px);
     // do similar with the minute hand as the second hand
@@ -205,27 +214,24 @@ extern "C" void app_main() {
             .offset(0,128));
     update_time_info(time_rtc.now()); // prime the digital clock
     weekday.text(time_weekday);
-    weekday.text_open_font(&text_font);
-    weekday.text_line_height(35);
-    weekday.text_color(color32_t::white);
+    weekday.font(text_font35);
+    weekday.color(color32_t::white);
     weekday.text_justify(uix_justify::top_middle);
     main_screen.register_control(weekday);
     // init the digital clock, (screen-width)x40, below the weekday
     dig_clock.bounds(
         srect16(0,0,main_screen.bounds().x2,39)
-            .offset(0,128+weekday.text_line_height()));
+            .offset(0,128+text_font35.line_height()));
     dig_clock.text(time_datetime);
-    dig_clock.text_open_font(&text_font);
-    dig_clock.text_line_height(35);
-    dig_clock.text_color(color32_t::white);
+    dig_clock.font(text_font35);
+    dig_clock.color(color32_t::white);
     dig_clock.text_justify(uix_justify::top_middle);
     main_screen.register_control(dig_clock);
 
     const uint16_t tz_top = dig_clock.bounds().y1+dig_clock.dimensions().height;
     timezone.bounds(srect16(0,tz_top,main_screen.bounds().x2,tz_top+40));
-    timezone.text_open_font(&text_font);
-    timezone.text_line_height(30);
-    timezone.text_color(color32_t::light_sky_blue);
+    timezone.font(text_font30);
+    timezone.color(color32_t::light_sky_blue);
     timezone.text_justify(uix_justify::top_middle);
     main_screen.register_control(timezone);
 
@@ -246,7 +252,7 @@ extern "C" void app_main() {
     
     // set up a custom canvas for displaying our battery icon
     battery_icon.bounds(
-        (srect16)faBatteryEmpty.dimensions().bounds());
+        (srect16)faBatteryEmptyIco.dimensions().bounds());
     battery_icon.on_paint_callback(battery_icon_paint);
     main_screen.register_control(battery_icon);
     

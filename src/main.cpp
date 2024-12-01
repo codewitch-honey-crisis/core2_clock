@@ -162,6 +162,9 @@ void setup() {
     Serial.begin(115200);
     printf("Arduino version: %d.%d.%d\n",ESP_ARDUINO_VERSION_MAJOR,ESP_ARDUINO_VERSION_MINOR,ESP_ARDUINO_VERSION_PATCH);
 #else
+void uix_on_yield(void* state) {
+    taskYIELD();
+}
 extern "C" void app_main() {
     printf("ESP-IDF version: %d.%d.%d\n",ESP_IDF_VERSION_MAJOR,ESP_IDF_VERSION_MINOR,ESP_IDF_VERSION_PATCH);
 #endif
@@ -183,7 +186,9 @@ extern "C" void app_main() {
     main_screen.buffer1(panel_transfer_buffer1);
     main_screen.buffer2(panel_transfer_buffer2);
     main_screen.background_color(color_t::black);
-    
+#ifndef ARDUINO
+    main_screen.on_yield_callback(uix_on_yield);
+#endif
     // init the analog clock, 128x128
     ana_clock.bounds(srect16(0,0,127,127).center_horizontal(main_screen.bounds()));
     ana_clock.face_color(color32_t::light_gray);
